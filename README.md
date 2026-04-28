@@ -88,20 +88,45 @@ Full text in [INVARIANTS.md](INVARIANTS.md).
 
 ## Install
 
-### As a Claude Code plugin (recommended)
+Abelian ships **two first-class drivers**. Pick the one matching your team's primary tool. Mechanism parity is ~99%; the only difference is dispatch vocabulary.
+
+### Claude Code primary (full Claude Code skill)
 
 ```
 /plugin marketplace add cauchyturing/abelian
 /plugin install abelian@abelian
 ```
 
-### Or clone directly
+Or clone directly:
 
 ```bash
 git clone https://github.com/cauchyturing/abelian.git ~/.claude/skills/abelian
 ```
 
-Restart Claude Code or start a new session — the skill auto-registers.
+Restart Claude Code; the skill auto-registers. Invoke with `/abelian program.md`.
+Details: [`drivers/claude-code/README.md`](drivers/claude-code/README.md).
+
+### Codex CLI primary (bash driver)
+
+```bash
+git clone https://github.com/cauchyturing/abelian.git ~/abelian
+cd /your/project
+~/abelian/drivers/codex-cli/abelian.sh program.md
+```
+
+Self×self default (codex × codex). No anthropic SDK install, no cross-family wrapper required. Details: [`drivers/codex-cli/README.md`](drivers/codex-cli/README.md).
+
+### Driver compatibility matrix
+
+| Capability | Claude Code primary | Codex CLI primary |
+|---|---|---|
+| Mutator | Claude session via `/abelian` skill | `codex exec -s workspace-write` per round |
+| Adversary (default) | `Agent + Skill('dissect')` (self×self Claude) | `codex exec` + `prompts/dissect.md` (self×self codex) |
+| Cross-family adversary | `--adversary=codex` (built-in via Codex MCP) | Build your own (sketch in driver README) |
+| Co-research mode | `--mode=co-research` (built-in) | Two `codex exec` with different framing (extend script) |
+| 11 INVARIANTS | All hold | All hold |
+| state.json + nonce header + 7-check commit-gate | Identical | Identical |
+| Cost | 1 Claude session + dissect subagent calls | 2 codex exec calls per round |
 
 ## Quick start
 

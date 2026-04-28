@@ -1,6 +1,6 @@
 ---
 name: abelian
-version: 2.8.0
+version: 2.8.1
 description: >
   **Umbrella name for two distinct iteration modes** sharing common
   anti-collapse + anti-compaction infrastructure (portfolio, escalation,
@@ -209,7 +209,12 @@ For each round:
 
 ## Adversary
 
-Default: Claude subagent running `Skill('dissect')`, isolated context per round (does not bloat the loop's main context). Same model family as Generator — structural role split, weak prior split.
+**Driver-neutral protocol**: a fresh adversary subagent receives a prompt that includes verbatim `program.md` Goal/Target/Constraints/Attack-Classes + a fresh nonce + ISO timestamp, executes in isolated context with its own tool access (Read/Bash/Write or equivalent), writes the attack list to `$RUN_DIR/round-N/adversary.txt` with a mandatory `ABELIAN-ADV-v1` header (rule #11), and returns the verdict line. Two reference dispatches:
+
+- **Claude Code primary**: `Agent(general-purpose)` running `Skill('dissect')` — see [`drivers/claude-code/README.md`](drivers/claude-code/README.md). This is the default for `/abelian program.md` invocation in a Claude Code session. Adversary subagent is a Claude with same RLHF family as the mutator — structural role split, weak prior split.
+- **Codex CLI primary**: `codex exec - -s workspace-write` subprocess + the [`prompts/dissect.md`](prompts/dissect.md) template — see [`drivers/codex-cli/README.md`](drivers/codex-cli/README.md) and the runnable [`drivers/codex-cli/abelian.sh`](drivers/codex-cli/abelian.sh). Self×self default (codex × codex with different prompt context per role at full max-effort).
+
+Both drivers honor the same protocol and INVARIANTS. The descriptions below use Claude Code idiom (Agent / Skill / MCP) because abelian's original implementation was Claude Code. Codex CLI users substitute `codex exec` for `Agent(...)` and `prompts/dissect.md` content for `Skill('dissect')`. Mechanism, header, gate, and INVARIANTS are byte-for-byte identical.
 
 Override via `--adversary=<value>`:
 
