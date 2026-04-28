@@ -1,6 +1,6 @@
 ---
 name: abelian
-version: 2.8.1
+version: 2.8.2
 description: >
   **Umbrella name for two distinct iteration modes** sharing common
   anti-collapse + anti-compaction infrastructure (portfolio, escalation,

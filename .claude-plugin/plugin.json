@@ -1,6 +1,6 @@
 {
   "name": "abelian",
-  "version": "2.8.1",
+  "version": "2.8.2",
   "description": "A symmetric iteration loop: mutate, attack, keep what survives. File-gated, drift-checked, anti-compaction. Two modes — unilateral verification or co-research peer-attack discovery.",
   "author": {
     "name": "Stephen",

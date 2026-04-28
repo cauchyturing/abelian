@@ -177,34 +177,29 @@ PYEOF
 
   ADV_PROMPT="$ROUND_DIR/adversary-prompt.txt"
   ADV_OUTPUT="$(pwd)/$ROUND_DIR/adversary.txt"
-  PROGRAM_VERBATIM=$(cat "$PROGRAM")
-  DIFF=$(git diff || echo "(no diff)")
   CWD=$(pwd)
 
+  ABELIAN_PROGRAM_PATH="$PROGRAM" \
   python3 - "$PROMPT_TEMPLATE" "$RUN_ID" "$ROUND" "$NONCE" "$STARTED_AT" "$ADV_OUTPUT" "$CWD" "$EVAL_VALUE" > "$ADV_PROMPT" <<'PYEOF'
-import sys
+import os, sys, subprocess
 template = open(sys.argv[1]).read()
-program = open("$PROGRAM" if False else sys.argv[0].replace("prompts/dissect.md","") or open(sys.stdin.fileno()).read() if False else "").read() if False else None
-# Use environment for substitution
-import os, subprocess
-program = open(os.environ.get("PROGRAM_PATH", "program.md")).read() if "PROGRAM_PATH" in os.environ else ""
-diff_proc = subprocess.run(["git","diff"], capture_output=True, text=True)
-diff = diff_proc.stdout
+program  = open(os.environ["ABELIAN_PROGRAM_PATH"]).read()
+diff     = subprocess.run(["git","diff"], capture_output=True, text=True).stdout or "(no diff)"
 print(template
-  .replace("{{RUN_ID}}", sys.argv[2])
-  .replace("{{ROUND}}", sys.argv[3])
-  .replace("{{PEER}}", "unilateral")
-  .replace("{{NONCE}}", sys.argv[4])
+  .replace("{{RUN_ID}}",     sys.argv[2])
+  .replace("{{ROUND}}",      sys.argv[3])
+  .replace("{{PEER}}",       "unilateral")
+  .replace("{{NONCE}}",      sys.argv[4])
   .replace("{{STARTED_AT}}", sys.argv[5])
-  .replace("{{OUTPUT_PATH}}", sys.argv[6])
-  .replace("{{CWD}}", sys.argv[7])
-  .replace("{{EVAL_OUTPUT}}", sys.argv[8])
+  .replace("{{OUTPUT_PATH}}",sys.argv[6])
+  .replace("{{CWD}}",        sys.argv[7])
+  .replace("{{EVAL_OUTPUT}}",sys.argv[8])
   .replace("{{PROGRAM_MD}}", program)
-  .replace("{{DIFF}}", diff))
+  .replace("{{DIFF}}",       diff))
 PYEOF
 
   echo "  [4]   dispatch codex adversary (nonce $NONCE)..."
-  PROGRAM_PATH="$PROGRAM" codex exec - -s workspace-write -c 'model_reasoning_effort="high"' < "$ADV_PROMPT" \
+  codex exec - -s workspace-write -c 'model_reasoning_effort="high"' < "$ADV_PROMPT" \
     > "$ROUND_DIR/adversary-call.log" 2>&1 || true
 
   # Extract verdict line from adversary.txt header
