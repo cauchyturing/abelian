@@ -1,0 +1,24 @@
+{
+  "name": "abelian",
+  "version": "2.8.0",
+  "description": "A symmetric iteration loop: mutate, attack, keep what survives. File-gated, drift-checked, anti-compaction. Two modes — unilateral verification or co-research peer-attack discovery.",
+  "author": {
+    "name": "Stephen",
+    "url": "https://github.com/cauchyturing"
+  },
+  "homepage": "https://github.com/cauchyturing/abelian",
+  "repository": "https://github.com/cauchyturing/abelian",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "skill",
+    "iteration",
+    "loop",
+    "adversarial",
+    "co-research",
+    "verification",
+    "discovery",
+    "anti-collapse",
+    "anti-compaction"
+  ]
+}
