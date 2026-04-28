@@ -10,6 +10,12 @@
 # Implements the v2.8 protocol: state.json source-of-truth, INVARIANTS.md
 # re-read per round, file-gated commit (7 checks), drift detection,
 # nonce-based adversary header, pre-files snapshot, scoped revert.
+#
+# STATUS: REFERENCE IMPLEMENTATION (v2.8.3) — full v2.8 protocol implemented
+# in design but not yet smoketested end-to-end against a real codex CLI run.
+# First user is likely to hit minor issues (sandbox flag names, prompt size
+# limits, eval extraction edge cases). See TODO.md for specific points and
+# please file an issue or PR against cauchyturing/abelian.
 
 set -euo pipefail
 
@@ -145,10 +151,17 @@ adversary review on what you commit to the working tree.
 PYEOF
 
   echo "  [1+2] dispatch codex mutator..."
+  # TODO(smoketest): verify `-s workspace-write` flag name matches your codex CLI
+  #                  version (`codex exec --help | grep -A 2 sandbox`). Older
+  #                  versions used different sandbox-mode names; first user is
+  #                  expected to confirm and PR if needed.
   codex exec - -s workspace-write -c 'model_reasoning_effort="high"' < "$MUTATOR_PROMPT" \
     > "$ROUND_DIR/mutator-output.log" 2>&1 || true
 
   # Step 3: Eval
+  # TODO(smoketest): awk-based extraction of the first `## Eval` ... ```bash``` ```
+  #                  block. Fragile on programs with multiple Eval blocks or
+  #                  unusual section markers. Single-bash-block eval works.
   EVAL_CMD=$(awk '/^## Eval/{flag=1; next} /^## /{flag=0} flag' "$PROGRAM" \
              | awk '/^```bash/{flag=1; next} /^```$/{flag=0} flag' | head -1)
   [ -z "$EVAL_CMD" ] && { echo "ERROR: no Eval bash command in $PROGRAM" >&2; exit 1; }
@@ -199,6 +212,11 @@ print(template
 PYEOF
 
   echo "  [4]   dispatch codex adversary (nonce $NONCE)..."
+  # TODO(smoketest): same -s workspace-write caveat as mutator dispatch above.
+  # TODO(prompt-size): program.md + state.json + git diff injected here can hit
+  #                    codex CLI prompt budget on R10+ campaigns. Mitigations:
+  #                    pass only recent N rounds, strip whitespace, or use codex
+  #                    session-management features. See TODO.md.
   codex exec - -s workspace-write -c 'model_reasoning_effort="high"' < "$ADV_PROMPT" \
     > "$ROUND_DIR/adversary-call.log" 2>&1 || true
 
@@ -276,6 +294,14 @@ PYEOF
 done
 
 # ---------- Termination ----------
+# TODO(v2.9): add goal-met early termination check (eval ≤ target per program.md
+#             Metric block) — currently only --rounds cap fires. The Claude
+#             Code SKILL.md path handles this natively in step 6 (Place).
+# TODO(v2.9): auto-generate compound doc to docs/solutions/[category]/[goal-slug]-[date].md
+#             per SKILL.md "## When It Ends: Auto-Compound" — currently a manual step.
+# TODO(v2.9): post-campaign escalation review (mandatory per SKILL.md "## Escalation"
+#             Mandatory Post-Campaign Escalation Review section) — currently skipped
+#             by this driver.
 state_update ".status = \"cap-fired\" | .ended_at = \"$(python3 -c 'import datetime; print(datetime.datetime.now().astimezone().isoformat(timespec=\"seconds\"))')\""
 echo
 echo "═══════════════════════════════════════════════════════════════"

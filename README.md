@@ -6,6 +6,10 @@
 >
 > File-gated, drift-checked, anti-compaction.
 
+[![Version](https://img.shields.io/badge/version-2.8.3-blue.svg)](https://github.com/cauchyturing/abelian/releases)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Drivers](https://img.shields.io/badge/drivers-Claude%20Code%20%7C%20Codex%20CLI-orange.svg)](#install)
+
 Abelian is a [Claude Code](https://claude.com/claude-code) skill that turns any LLM session into a disciplined iteration loop. You hand it a `program.md` defining what to optimize, a deterministic `Eval`, and a `Strategy`. It mutates, evaluates, attacks, and keeps only what survives — round after round — with structural gates that compaction, fabrication, or drift cannot silently slip past.
 
 ```
@@ -59,7 +63,7 @@ For each round:
 2. Mutate    — pre-files snapshot (rule #5), then apply the change
 3. Evaluate  — shell command returns a number (or test-suite pass/fail)
 4. Adversary — subagent writes attack list to round-N/adversary.txt with mandatory
-               AUTORESEARCH-ADV-v1 header (rule #11) — nonce verified at commit
+               ABELIAN-ADV-v1 header (rule #11) — nonce verified at commit
 5. Confirm   — 7-check commit-gate (rule #2). All pass → git commit. Any fail → revert.
 6. Place     — replace champion (or per-cell incumbent in portfolio mode)
 7. Record    — state.rounds[N] updated; History line appended
@@ -82,7 +86,7 @@ These rules live in `INVARIANTS.md` and are re-read at the start of every round.
 8. **Self-judge discipline** — schema-grounding required; `--adversary=off` + self-judge hard-refused
 9. **Execution gate** — adversary-exhaustion alone is necessary but not sufficient
 10. **Production-runtime safety** — cron/supervisor/watchdog file edits need extra discipline
-11. **Adversary header block** — mandatory `AUTORESEARCH-ADV-v1` format with nonce + timestamp
+11. **Adversary header block** — mandatory `ABELIAN-ADV-v1` format with nonce + timestamp
 
 Full text in [INVARIANTS.md](INVARIANTS.md).
 
@@ -199,6 +203,45 @@ Abelian's niche: **bounded campaigns with deterministic eval and strict survive-
 | Co-research mode | ✓ (v2.6) | ✗ | ✗ |
 
 Use Abelian for *what to keep*. Use night-shift for *what to ship overnight*. Use ralph-loop for *what to keep working on*. They compose; they don't replace each other.
+
+## Project status
+
+Abelian is **v2.8.3 (2026-04-28)**. Functional but young.
+
+| Area | Status |
+|---|---|
+| Claude Code primary path (SKILL.md) | **Smoketested 2026-04-28** end-to-end on a Python speedup task — full v2.8 protocol exercised (state.json, INVARIANTS reread, nonce header, 7-check commit-gate, drift detection, goal-met termination, locked compound template). [Smoketest writeup](https://github.com/cauchyturing/abelian/tree/main) lives in commit history under run `2026-04-28-0414-r2`. |
+| Codex CLI driver (`drivers/codex-cli/abelian.sh`) | **Reference implementation, not yet smoketested.** Implements the full v2.8 protocol via `codex exec` subprocesses but has not been exercised against a real codex CLI run. First user is likely to hit minor issues (sandbox flag names, prompt size, eval extraction edge cases) — please [file an issue](https://github.com/cauchyturing/abelian/issues) or PR. |
+| INVARIANTS.md | **Frozen.** 11 rules, all derived from concrete failure modes (Cell 6 silent un-landing, scanner.py WIP cron breakage, atomic-swap silent-fail, dissect R3 attack-class miss). Won't change without a corresponding empirical finding. |
+| state.json schema | **Frozen for v2.8.x.** Backwards-compatible fields may be added in v2.9; breaking changes only at v3.0. |
+| Plugin marketplace install | Configured in `.claude-plugin/plugin.json`; first-time end-to-end install via `/plugin marketplace add` not yet verified by an external user. |
+
+## Known issues
+
+- **Codex CLI driver smoketest pending** (see Project status above). The bash + python plumbing is correct in design but un-exercised against real codex CLI invocations. See [`TODO.md`](TODO.md) for specific points.
+- **`abelian.sh` eval extraction is awk-based** and may break on `program.md` files with multiple `## Eval` blocks or unusual section markers. Single-bash-block eval works.
+- **Co-research mode in `abelian.sh`** is documented as "extend the script" but not implemented inline. The Claude Code SKILL.md path supports it natively.
+- **Cross-family adversary in `abelian.sh`** is documented as "build your own" with a sketch — no shipped wrapper. Most teams won't need this; codex × codex self×self is the recommended default.
+- **`SKILL.md` is 610 lines** — verbose by skill-design standards. Some of it could plausibly move to `references/`. Tracked in TODO but no immediate priority.
+
+## Roadmap
+
+| Version | Theme | When |
+|---|---|---|
+| v2.8.x | Codex CLI driver hardening (post-smoketest fixes) | As issues land |
+| v2.9 | Compound doc auto-generation in `abelian.sh` (currently TODO) + co-research mode in bash driver | Q3 2026 if demand |
+| v3.0 | Possibly: unify SKILL.md + drivers/ into a single driver-neutral spec; flip default to co-research per the v2.6 internal note; `INVARIANTS-CORE.md` extracted | Only after empirical track record validates the cost model |
+
+## Contributing
+
+Issues and PRs welcome. A few notes:
+
+- **INVARIANTS changes** require an empirical anchor. If you propose tightening rule #X, link a concrete failure mode or campaign that the current rule misses. Speculative tightening = friction with no evidence.
+- **Driver additions** (e.g., a Cursor or Aider driver) are welcome under `drivers/<name>/`. Mirror the codex-cli driver's structure: `README.md` + executable script + adherence to the same v2.8 protocol.
+- **Bug fixes** to `abelian.sh` python heredocs or codex sandbox flags get fast-tracked — that script is a reference impl explicitly waiting for first-user feedback.
+- **Nominal style**: terse, judgment-first prose. Avoid hedging language ("might", "could", "potentially") when a concrete claim works. Mirror the existing INVARIANTS.md / SKILL.md voice.
+
+For larger discussions (architectural changes, mode unification, name changes), open a GitHub Discussion or DM [@cauchyturing](https://github.com/cauchyturing).
 
 ## Acknowledgments
 
