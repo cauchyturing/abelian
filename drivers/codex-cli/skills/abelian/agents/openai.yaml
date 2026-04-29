@@ -1,0 +1,4 @@
+interface:
+  display_name: "Abelian"
+  short_description: "Run mutate-evaluate-adversary loops"
+  default_prompt: "Use $abelian to run an Abelian loop from this project's program.md."
