@@ -125,7 +125,7 @@ Wrap in a shell function/alias if you'll run it often. Details: [`drivers/codex-
 | Orchestrator | Claude main session | Codex main session |
 | Mutator | Claude (orchestrator session) | Codex (orchestrator session) |
 | Adversary subagent | `Agent(general-purpose) + Skill('dissect')` | Fresh `codex exec` subprocess + inlined `prompts/dissect.md` |
-| Cross-family adversary | `--adversary=codex` (built-in via Codex MCP) | Sketch only (anthropic SDK + tool-use wrapper — see codex-cli driver README) |
+| Cross-family adversary | `--adversary=codex` — orchestrator dispatches `codex exec` subprocess via Bash tool (codex CLI must be installed + auth'd; or codex MCP wrapper if user has one configured) | Sketch only (anthropic SDK + tool-use wrapper — see codex-cli driver README) |
 | 11 INVARIANTS | All hold | All hold |
 | state.json + nonce header + 7-check commit-gate | Identical | Identical |
 
@@ -184,7 +184,9 @@ Abelian's niche: **bounded campaigns with deterministic eval and strict survive-
 
 ## Status
 
-v2.10.0 (2026-04-28). Claude Code path smoketested 2026-04-28 (count_duplicate_pairs campaign — full v2.8 protocol exercised). Codex CLI invocation form un-tested by external user — see [TODO.md](TODO.md) for verification points and open work.
+v2.10.2 (2026-04-28). codex CLI subprocess is the canonical path; codex MCP is optional alternative if user has a wrapper.
+
+ Claude Code path with **dissect adversary** smoketested 2026-04-28 (count_duplicate_pairs campaign — full v2.8 protocol exercised). **codex CLI subprocess path** is functional locally (codex CLI installed + auth'd via `~/.codex/auth.json`) but not yet dogfooded against an abelian campaign — first run of `--adversary=codex` will be the smoketest. **codex MCP wrapper path** (optional alternative) is not maintained by abelian; if you have a wrapper configured, the orchestrator may use it. **Codex CLI primary driver** invocation form un-tested by external user — see [TODO.md](TODO.md).
 
 ## Contributing
 

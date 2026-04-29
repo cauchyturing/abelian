@@ -1,6 +1,6 @@
 ---
 name: abelian
-version: 2.10.0
+version: 2.10.2
 description: >
   **Umbrella name for two distinct iteration modes** sharing common
   anti-collapse + anti-compaction infrastructure (portfolio, escalation,
@@ -236,7 +236,7 @@ Override via `--adversary=<value>`:
 | Value | Adversary | Prior separation | Cost | When to use |
 |-------|-----------|------------------|------|-------------|
 | `dissect` (default) | Claude subagent + `Skill('dissect')` | Weak (same RLHF family) | Low | Most cases, zero-config, portable |
-| `codex` | Codex MCP (`mcp__codex__codex`, **latest stable** — currently `gpt-5.5` — + xhigh per `feedback_codex_review_config.md`) | Strong (cross model family) | High | High stakes, self-judge eval, key decisions |
+| `codex` | codex CLI subprocess: `codex exec - -s read-only -c 'model_reasoning_effort="high"' < prompt`. Requires codex CLI installed (`npm i -g @openai/codex`) + `codex login` (auth lives in `~/.codex/auth.json`). The orchestrator may alternatively use a codex MCP wrapper if one is configured — the protocol does not depend on the dispatch mechanism. | Strong (cross model family) | High | High stakes, self-judge eval, key decisions |
 | `both` | Both adversaries; **union of attacks** (no consensus required) | Strongest | Highest | 24/7 night-shift, PR-level / production decisions |
 | `off` | None | — | None | Shell-eval only; **refused** when Eval is `self-judge` |
 
@@ -247,10 +247,10 @@ Override via `--adversary=<value>`:
 **Adversary's job:** find what breaks, NOT propose alternatives. Cannot endorse, only attack.
 
 **Graceful degradation (loud, never silent):**
-- `--adversary=codex` + Codex MCP unavailable → degrade to `dissect`, **write notice in 3 places**: console (stderr), `abelian/escalations.md`, and History row for the affected rounds. Continue loop.
-- `--adversary=both` + Codex MCP unavailable → degrade to `dissect`-only with same 3-place notice. Continue loop.
-- Degradation decision is made **once at loop start** — don't re-check Codex every round (noise + unpredictable runs).
-- The notice must include the why: "Codex MCP `mcp__codex__codex` not reachable; cross-model adversary disabled; runs are weaker on prior diversity for this session."
+- `--adversary=codex` + codex CLI unavailable (binary missing OR `~/.codex/auth.json` absent OR codex MCP wrapper not configured) → degrade to `dissect`, **write notice in 3 places**: console (stderr), `abelian/escalations.md`, and History row for the affected rounds. Continue loop.
+- `--adversary=both` + codex CLI unavailable → degrade to `dissect`-only with same 3-place notice. Continue loop.
+- Degradation decision is made **once at loop start** — don't re-check codex every round (noise + unpredictable runs).
+- The notice must include the why: "codex CLI not reachable (run `codex login` and verify `codex exec --version`); cross-model adversary disabled; runs are weaker on prior diversity for this session."
 - `--adversary=off` + Eval=`self-judge` → **hard refuse to start** (no degradation). This combination has zero LLM check on a vibes-based eval — structurally unsafe.
 
 **Honest limit:** Default `dissect` breaks structural self-collapse but does NOT break model-family collapse. Two Claudes with role split still share RLHF priors. For high-stakes decisions, `--adversary=codex` is the cross-model upgrade — don't default-trust the default.
@@ -364,7 +364,7 @@ To engineer diversity without different models:
 The dispatch should give each peer a DIFFERENT slice of context, not
 just a different prompt prefix.
 
-When unavailable Codex MCP at startup → degrade to `claude-opus,claude-opus
+When codex CLI unavailable at startup → degrade to `claude-opus,claude-opus
 + different context`, NOT to `claude-opus,claude-haiku`. Loud notice
 in console + escalations.md (same protocol as unilateral).
 
@@ -622,7 +622,7 @@ Adversary-exhaustion is **necessary but not sufficient** for termination. The lo
 - Never edit files outside Target
 - Never modify the eval command itself (adding regression tests to expand coverage is OK; changing what is measured is not)
 - Never run with `--adversary=off` when Eval is `self-judge` — refuse to start (no degradation)
-- When requested adversary is unavailable (e.g., Codex MCP missing), degrade gracefully to `dissect` — but the degradation MUST be loud (console + escalations.md + History). Silent fallback is forbidden.
+- When requested adversary is unavailable (e.g., codex CLI binary missing OR not auth'd OR codex MCP wrapper not configured), degrade gracefully to `dissect` — but the degradation MUST be loud (console + escalations.md + History). Silent fallback is forbidden.
 - Always revert on error
 - If metric worsens >50% in one round, flag and revert
 - **Long eval MUST be detached (v2.4).** Eval commands with any of: wallclock >30s, spill to disk, window/sort over >10M rows, or known memory footprint >2 GB MUST run via `nohup <cmd> > logs/X.log 2>&1 & echo $! > logs/X.pid`. Inline (blocking) eval is ONLY for deterministic <30s shell commands. Rationale: in-session OOM can kill the loop's parent Claude process (confirmed 2026-04-22 Polymarket DuckDB spill + 2026-04-24 FCI bench 57GB RSS balloon). Detached eval survives session death; the next round reads `logs/X.pid` + `logs/X.log` to pick up. Cap `--threads` to ~half of cores for jobs with spill-manager (DuckDB, joblib with BLAS inner) to leave headroom.

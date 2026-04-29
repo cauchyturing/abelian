@@ -23,7 +23,7 @@ Restart Claude Code; the skill auto-registers.
 /abelian program.md
 ```
 
-Default mode = **co-research** (two Claude peers each propose + attack via `Agent` calls with different context-framing). Switch to single-axis verification mode with `--mode=unilateral` (mutator + dissect adversary). Add `--adversary=codex` for cross-family priors via Codex MCP on high-stakes runs.
+Default mode = **co-research** (two Claude peers each propose + attack via `Agent` calls with different context-framing). Switch to single-axis verification mode with `--mode=unilateral` (mutator + dissect adversary). Add `--adversary=codex` for cross-family priors on high-stakes runs — Claude session uses Bash tool to dispatch `codex exec` subprocess (codex CLI must be installed + auth'd; falls back to dissect with loud notice if codex unavailable).
 
 Abort: Ctrl+C / interrupt the Claude Code session → `status=interrupted` is written to `state.json`.
 

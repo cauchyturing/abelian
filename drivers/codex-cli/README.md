@@ -55,7 +55,7 @@ Almost none. Both paths are LLM-driven self-orchestration of the same SKILL.md s
 |---|---|---|
 | Entry | `/abelian program.md` slash command | `codex exec -s workspace-write "$(cat SKILL.md INVARIANTS.md prompts/dissect.md) ..."` |
 | Adversary subagent | `Agent(general-purpose) + Skill('dissect')` | Fresh `codex exec` subprocess + prompts/dissect.md inlined |
-| Cross-family option | `--adversary=codex` flag (Codex MCP) | anthropic SDK + manual prompt instruction (sketch above) |
+| Cross-family option | `--adversary=codex` flag — orchestrator dispatches `codex exec` subprocess (codex CLI installed + auth'd) | anthropic SDK + manual prompt instruction (sketch above) |
 | All else (state.json, INVARIANTS, nonce, gate, drift, modes, termination) | Identical | Identical |
 
 The dissect-style adversary methodology lives in `prompts/dissect.md` — same content for both drivers, different injection mechanism.
