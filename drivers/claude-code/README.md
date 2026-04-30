@@ -5,14 +5,14 @@ Native Claude Code skill path. Claude reads `SKILL.md` + `INVARIANTS.md` and orc
 ## Install
 
 ```
-/plugin marketplace add cauchyturing/abelian
+/plugin marketplace add Abel-ai-causality/abelian
 /plugin install abelian@abelian
 ```
 
 Or clone:
 
 ```bash
-git clone https://github.com/cauchyturing/abelian.git ~/.claude/skills/abelian
+git clone https://github.com/Abel-ai-causality/abelian.git ~/.claude/skills/abelian
 ```
 
 Restart Claude Code; the skill auto-registers.

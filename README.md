@@ -101,16 +101,16 @@ Two first-class drivers, both LLM-driven self-orchestration of the same `SKILL.m
 ### Claude Code primary
 
 ```
-/plugin marketplace add cauchyturing/abelian
+/plugin marketplace add Abel-ai-causality/abelian
 /plugin install abelian@abelian
 ```
 
-Or `git clone https://github.com/cauchyturing/abelian.git ~/.claude/skills/abelian`. Restart Claude Code; the skill auto-registers. Invoke: `/abelian program.md`. Details: [`drivers/claude-code/README.md`](drivers/claude-code/README.md).
+Or `git clone https://github.com/Abel-ai-causality/abelian.git ~/.claude/skills/abelian`. Restart Claude Code; the skill auto-registers. Invoke: `/abelian program.md`. Details: [`drivers/claude-code/README.md`](drivers/claude-code/README.md).
 
 ### Codex CLI primary
 
 ```bash
-git clone https://github.com/cauchyturing/abelian.git ~/abelian
+git clone https://github.com/Abel-ai-causality/abelian.git ~/abelian
 cd /your/project
 codex exec -s workspace-write "$(cat ~/abelian/SKILL.md ~/abelian/INVARIANTS.md ~/abelian/prompts/dissect.md)
 

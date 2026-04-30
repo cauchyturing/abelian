@@ -1,13 +1,13 @@
 {
   "name": "abelian",
-  "version": "2.13.0",
-  "description": "A symmetric iteration loop: mutate, attack, keep what survives. File-gated, drift-checked, anti-compaction. Two modes — unilateral verification or co-research peer-attack discovery.",
+  "version": "2.14.0",
+  "description": "Adversarial collaboration framework (Kahneman-style applied to LLM dispatch) for deep, innovative, long-horizon iteration with tractable doc and testable metric. Two LLM peers each propose AND challenge each other; mutual inspiration between rounds; mechanism-converge termination. 13 INVARIANTS rules harden against fabrication, drift, and compaction.",
   "author": {
     "name": "Stephen",
     "url": "https://github.com/cauchyturing"
   },
-  "homepage": "https://github.com/cauchyturing/abelian",
-  "repository": "https://github.com/cauchyturing/abelian",
+  "homepage": "https://github.com/Abel-ai-causality/abelian",
+  "repository": "https://github.com/Abel-ai-causality/abelian",
   "license": "MIT",
   "keywords": [
     "claude-code",
