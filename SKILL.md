@@ -1,13 +1,15 @@
 ---
 name: abelian
-version: 2.12.0
+version: 2.13.0
 description: >
-  **Umbrella name for two distinct iteration modes** sharing common
-  anti-collapse + anti-compaction infrastructure (portfolio, escalation,
-  attack-class checklist, schema-grounding, execution-gate, post-campaign
-  escalation review, plus v2.8: file-gated commits, drift check, per-round
-  INVARIANTS.md re-read, state.json source-of-truth, forbidden termination
-  rationales, pre-files snapshot, locked compound template — see INVARIANTS.md):
+  **Adversarial collaboration framework** (Kahneman-style applied to LLM
+  dispatch) for deep, innovative, long-horizon iteration with tractable
+  doc and testable metric. Two LLM peers each propose AND challenge each
+  other; mutual inspiration between rounds; mechanism-converge termination.
+  13 INVARIANTS rules provide long-horizon scaffolding (file-gate, drift,
+  nonce, anti-compaction, forbidden termination rationales) — shared
+  substrate with unilateral review frameworks; not abelian-specific.
+  Two iteration modes:
 
   - **Co-research mode (default since v2.10, "auto-research-loop")** — two peer
     agents both propose AND challenge each other goal-driven; mutual inspiration
