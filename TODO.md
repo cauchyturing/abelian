@@ -90,3 +90,41 @@ campaign is the smoketest commit history.
 - **No bash wrapper script** (v2.10 removed). Both drivers are LLM
   agent harnesses orchestrating SKILL.md directly. Adding a shell
   layer is redundant.
+
+## v2.13 → future: NS-borrowable backlog (Stephen 2026-04-29 audit)
+
+After v2.13 reframe (abelian = adversarial collaboration framework), 6 NS
+features remain considered for borrow. Priority by abelian-fit:
+
+**High priority**:
+- **Plan-first ratchet** (NS Inner 1) —落盘 `round-N/plan.md` (files/approach/test-strategy/risks) before mutate; commit-gate adds 9th check (plan.md non-empty + Target files referenced). Prevents "想不清就开干". Earlier proposed (peer-A Vector A) but not shipped.
+- **Codex review loop-until-clean** (NS Inner 3) — rule #12 升级: P1/P2 found → fix → re-review → max 10 rounds → revert. Single-pass current form misses NS's true effect source.
+
+**Medium priority**:
+- **Eval evidence completeness check** (NS Inner 4 reframed) — embed in step 3 Eval rather than separate step (peer-B F2.3 self-attack 学到): require deliverable existence + UI screenshot for UI tasks.
+- **Subagent delegation rules** — co-research peer dispatch prompts MUST include "you may NOT git add/commit, you may NOT modify outside Target". Currently implicit.
+- **Mid-run direction propose + adversary review** (NS #2/#3) — Strategy in program.md is pre-fixed; long-horizon innovative task may benefit from "round N: should we revise direction?" with adversary review.
+
+**Low priority** (defer until empirical need surfaces):
+- **Stop / Resume / Abandon** — only relevant if abelian truly runs 4h+ long-horizon campaign and gets interrupted.
+- **"Never push to remote"** — explicit safety rule for autonomous loop. Quick add (1 line in INVARIANTS or Safety Rules section).
+
+## v2.13 → future: abelian-specific gaps surfaced by dry-run (Stephen 2026-04-29)
+
+Dry-run of abelian co-research on a doc-task (1-page abelian-vs-night-shift
+selector) surfaced 3 fundamental gaps NOT addressed by NS-borrowable list:
+
+- **Schema-grounding for fuzzy ground sources** (rule #8 extension) — current rule #8 assumes structured external source (file/column/API/signature) exists for self-judge to verify against. Doc-tasks where "ground truth" is fuzzy (e.g., user-fit judgment, narrative coherence, decision quality) need explicit fuzzy-ground protocol: which textual source counts as ground? Is it the program.md Goal restatement? User-supplied reference doc? Confirms peer-B F5.1.
+- **Doc-task cross-attack quality** — co-research peers attacking each other's prose (markdown drafts) tends to degenerate into "prefer my style" rather than "find what breaks". Code-diff cross-attack has clear failure modes (test fail / type error / regression); doc-diff has none. Needs cross-attack template specifically for prose: what's a "real attack" on a doc?
+- **Attack-class library by domain** — 7 default + per-program domain-specific is trial-and-error per user. Need shipped libraries:
+  - research-class: selection-bias / overfit / regime-shift / look-ahead / target-leakage / replication-failure
+  - audit-class: confirmation-bias / motivated-reasoning / cherry-pick / strawman
+  - decision-class: sunk-cost / loss-aversion / availability-heuristic / scope-creep
+  - doc-class: scope-drift / hidden-assumption / definition-elasticity / authority-by-citation
+  Without library, every program.md author re-invents domain-specific attack classes inconsistently.
+
+These 3 gaps are **higher priority than NS-borrowable backlog** for abelian's
+positioning (deep + innovative + long-horizon + tractable doc + testable
+metric). Without them, doc-task / research-task / decision-task users
+encounter friction not found in code-tasks.
+
