@@ -1,7 +1,7 @@
 {
   "name": "abelian",
-  "version": "2.16.0",
-  "description": "Adversarial collaboration framework (Kahneman-style applied to LLM dispatch) for deep, innovative, long-horizon iteration with tractable doc and testable metric. Two LLM peers each propose AND challenge each other; mutual inspiration between rounds; mechanism-converge termination. 16 INVARIANTS rules harden against fabrication, drift, compaction, mission drift, cross-layer evidence confusion, and program-contract fuzziness. v2.16: round-0 Program Contract Gate (rule #16) — hard checklist + Takeaway as derived contract with quote-grep + semantic linkage + measured baseline eval + file-gated program-adversary + sha256 contract hash + TTY-aware confirmation. v2.15: telos shift to goal-driven co-research via Mission Thread (rule #14), Evidence Class enum (rule #15), Frame-break Protocol.",
+  "version": "2.17.0",
+  "description": "Adversarial collaboration framework (Kahneman-style applied to LLM dispatch) for deep, innovative, long-horizon iteration with tractable doc and testable metric. Two LLM peers each propose AND challenge each other; mutual inspiration between rounds; mechanism-converge termination. 17 INVARIANTS rules harden against fabrication, drift, compaction, mission drift, cross-layer evidence confusion, fuzzy-program-contract, and now (v2.17) fuzzy-mission upstream. v2.17: opt-in `abelian sharpen` mode runs adversarial goal sharpening (triage + outcome distillation + metric forge + lever surfacing + Takeaway derivation, 5 passes with co-research divergence + dissect attack classes) to compile fuzzy mission to rule #16-compliant program.md draft. Native answer to OKR's hierarchical decomposition.",
   "author": {
     "name": "Stephen",
     "url": "https://github.com/cauchyturing"
@@ -24,6 +24,8 @@
     "mission-thread",
     "frame-break",
     "program-contract",
-    "round-zero-gate"
+    "round-zero-gate",
+    "goal-sharpening",
+    "fuzzy-to-sharp"
   ]
 }

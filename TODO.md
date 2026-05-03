@@ -292,3 +292,66 @@ v2.5-v2.15 program.md without Takeaway → `--migrate-takeaway` (Takeaway-only d
 ### Cost
 
 +$0.10/start (dissect program-adversary). On $3-5 multi-round campaign = 2-3% overhead. 50× ROI on a single 56-round-fuzz catch.
+
+## v2.17 — Adversarial Goal Sharpening (2026-05-03)
+
+**Trigger**: hours after v2.16 shipped, Stephen flagged: rule #16 hard-checklist REJECTS fuzzy program.md (measurable-noun whitelist), routing fuzzy missions to ce-brainstorm. But user goals are often fuzzy at first contact. OKR (night-shift's hierarchical decomposition Objective→KR→Task) is one method to compile fuzzy → sharp; what's abelian's native method? Answer: **adversarial sharpening** — recursive application of abelian's own propose+attack+converge to goal-authoring itself.
+
+**Designed via 2-round co-research with codex (peer-B, gpt-5.5 xhigh)**, 10 verified findings integrated, ACCEPT-WITH-FIXES convergence.
+
+### Spec landed
+
+- **rule #17 (NEW) — Adversarial Goal Sharpening Protocol** (opt-in): triggered by `abelian sharpen "<fuzzy mission>"` or `abelian sharpen --mission-file <path>`. Bare strings to `abelian` NEVER auto-classified as fuzzy missions (closes typo-as-mission risk per codex round-2 attack 2). File auto-detect: existing file lacking `## Goal` section prompts user to run sharpening.
+- **rule #16 A amendment**: Strategy=1 allowed IFF `state.sharpening.triage_classification = "single-axis"` AND `--mode=unilateral`. Closes codex round-2 attack 1 (single-axis triage was guaranteed gate-fail without amendment).
+- **5-pass protocol** (Pass 0 triage + Pass 1-3 file-gated co-research + Pass 4 mechanical):
+
+| Pass | Output | Adversary classes | Cost |
+|---|---|---|---|
+| 0 — Triage | sharp / fuzzy-but-grounded / fuzzy-ungrounded / single-axis classification | n/a | ~$0.05 |
+| 1 — Outcome Distillation + Grounding | observable end-state + ≥1 ground citation | c1, c2 | ~$0.5 |
+| 2 — Metric Forge + Runnable Eval | metric (name/direction/tolerance/baseline=TBD) + runnable shell command + dry-run-parse | c3, c4 | ~$0.5 |
+| 3 — Lever + Constraint (merged per Route A) | ≥2 Strategy axes + Constraints | d4, c1 | ~$0.5 |
+| 4 — Takeaway Derivation | mechanical compose Takeaway 3 fields | mechanical_validator (3 sub-checks) | $0 |
+
+- **Bounded reconnaissance**: fuzzy mission text + `--target-hint` paths + top-3 noun grep + last 200 lines of session history. Forbidden: full repo TODOs, CLAUDE.md, full git log. Each entry recorded in trace.json with command + hit_count + selected_excerpt + citation_type (codex round-2 attack 4).
+- **Mechanical converge predicate** (3 conditions per pass): attack_survival + mission_traceability + rule_16_composability (codex round-1 attack 5: not "peers agree", v2.15 anti-consensus posture).
+- **Pass 4 mechanical_validator** (codex round-2 verdict 1 rename): source_coverage + rule_16_B_quote_grep + semantic_linkage. Not "attack_survival trivial" — it's deterministic validation, distinct semantics.
+- **Output bundle** (Route D): `$RUN_DIR/sharpening/{pass-0/triage.md, pass-N/{peer-A.md, peer-B.md, adversary.txt, converged.md}, trace.json}` + composed `program.md`. Per-pass `artifact_integrity` (path/sha256/nonce/started_at/verdict_line/model_or_peer/retry_count) for full audit (codex round-2 verdict 5).
+- **Eval ground always includes (d) verbatim fuzzy_mission** (codex round-1 attack 6): rule #8 native anchor preserved.
+- **Rule #16 round-0 takeover**: after sharpening produces draft, rule #16 round-0 gate runs as if user wrote program.md. Round-0 baseline eval against Pass 2's pre-validated Eval command closes the `TBD-measure-at-round-0` placeholder.
+
+### Surface area
+
+| | Count |
+|---|---|
+| New INVARIANTS rule | 1 (rule #17) |
+| Existing rules amended | 1 (#16 A Strategy ≥2 exception) |
+| New subcommand | 1 (`abelian sharpen`) |
+| New flags | 3 (`--mission-file`, `--target-hint`, `--interactive-sharpening`) |
+| New triage classifications | 4 (sharp / fuzzy-but-grounded / fuzzy-ungrounded / single-axis) |
+| Reused machinery | dissect attack classes c1-c4+d4, rule #11 nonce header, peer-A/peer-B framing, rule #8 fuzzy-ground option (d) |
+| Diff (v2.17 over v2.16) | ~600 lines |
+
+### Razor history (codex co-research)
+
+| # | Source | Caught |
+|---|---|---|
+| 1 | Stephen | flagged "OKR is one method, what's yours in the new era" — pushed for native abelian method |
+| 2 | peer-A self-attack (A1-A6) | overlap with rule #16, cost ~$2.5, separate vs extend rule #16, intervention default, fail-out specificity, reconnaissance scope |
+| 3 | peer-B codex round-1 (6 attacks: 2 BLOCKER + 4 MAJOR) | file-gated artifacts (BLOCKER), TBD baseline + runnable eval (MAJOR), Pass 1 grounding before outcome (MAJOR), single-axis legitimate exit (MAJOR), mechanical converge predicate not "peers agree" (MAJOR), fuzzy_mission preserved as Eval ground (d) (MAJOR) |
+| 4 | peer-A counter-pushes (C1-C6) | reject Route B (rule #17 separate), Pass 0 triage NOT embedded in Pass 1, Pass 4 mechanical predicate, single-axis redirect WITHIN abelian, reconnaissance scope discipline, trace.json schema |
+| 5 | peer-B codex round-2 (4 attacks: all MAJOR) | rule #16 A exception needed for single-axis, no broad string auto-detect (typo risk), Pass 4 predicate naming (mechanical_validator_passed), reconnaissance provenance recording with citation_type |
+
+Final spec is integration of all 10 verified findings across 2 rounds, single PR, single dense rule #17. 
+
+### Backwards compat
+
+`abelian program.md` unchanged behavior — sharpening is purely additive opt-in. v2.5-v2.16 program.md files run as before. `abelian sharpen` is new entrypoint; users with sharp goals never trigger it.
+
+### Cost
+
+~$1.65-2.15 per fuzzy mission ($0.05 triage + $1.5 Pass 1-3 + $0 Pass 4 + $0.10 round-0). 100× ROI on a single 56-round-fuzz catch ($3-5 wasted on attack-clean-but-mission-flat rounds).
+
+### Why this not OKR
+
+OKR is hierarchical decomposition done by user (KR step requires user cognitive scaffolding). v2.17 is per-field adversarial sharpening done by LLM peer pair + dissect adversary. In LLM era: enumerate-and-attack uses model strength (parallel framings, cross-attack, mechanism surfacing) where OKR's KR step relies on user's structured thinking. night-shift uses OKR upstream of abelian; v2.17 keeps users within the framework.

@@ -719,7 +719,12 @@ failure.
   validation in step C without rejecting legitimate measurement noise.
 - **Strategy**: ≥2 axes (chains C>1 and co-research depend on
   diversity; single-axis means use `unilateral` mode and a different
-  tool, not abelian).
+  tool, not abelian). **v2.17 exception**: Strategy=1 is permitted IFF
+  `state.sharpening.triage_classification = "single-axis"` AND program.md
+  is launched with `--mode=unilateral`. This handles the case where
+  rule #17 sharpening discovers the mission is genuinely single-axis
+  verification — the loop redirects within abelian (unilateral mode)
+  rather than rejecting outside it.
 - **Attack Classes**: ≥1 named library from {default, doc-class,
   research-class, audit-class, decision-class} OR ≥1 custom domain
   extension.
@@ -1001,3 +1006,343 @@ forward. Rule #16 closes this upstream cause: contract checked,
 measured, hashed, human-signed before any round runs.
 
 Design history + co-research razors: see [TODO.md](TODO.md) "v2.16".
+
+## 17. Adversarial Goal Sharpening Protocol (v2.17, opt-in)
+
+Rule #16 enforces program.md sharpness but REJECTS fuzzy program.md
+(measurable-noun whitelist, baseline tolerance, Takeaway derivation).
+This is correct discipline — but a fuzzy mission like "improve trading
+internal" has no path from user to abelian beyond manual program.md
+authoring or routing to ce-brainstorm.
+
+OKR (objective → key results → tasks) is one method to compile fuzzy
+goal to actionable spec, but it relies on hierarchical decomposition
+done by the user. Rule #17 is abelian's native answer: **adversarial
+goal sharpening** — recursive application of the loop's own
+propose+attack+converge machinery to goal-authoring itself, producing
+a rule #16-compliant program.md draft from a fuzzy mission.
+
+Opt-in. Does not run unless explicitly triggered. Rule #16 round-0
+gate runs unchanged after sharpening produces draft.
+
+### Trigger
+
+- `abelian sharpen "<fuzzy mission>"` (string mode, explicit)
+- `abelian sharpen --mission-file <path>` (file mode, explicit)
+- File auto-detect: `abelian <existing-file>` where the file LACKS a
+  `## Goal` section → orchestrator prompts "this looks like a draft,
+  not a program.md. Run sharpening to compose it? (yes / no)".
+  Bare strings to `abelian` are NEVER auto-classified as fuzzy
+  missions (closes typo-as-mission risk, e.g., `abelian progrma.md`
+  with typo would otherwise become a sharpening run).
+
+### Pass 0 — Triage
+
+Single LLM call (~$0.05). Classify the fuzzy mission:
+
+- **`sharp`** — mission already program.md-grade (has measurable
+  noun + grounded reference). Output diagnostic: "Already sharp;
+  write program.md and run `abelian program.md` directly." Exit
+  non-zero. Do NOT proceed to Pass 1+.
+- **`fuzzy-but-grounded`** — missing structure but has reference
+  points (existing files / specs / verbatim user message). Proceed
+  to Pass 1.
+- **`fuzzy-ungrounded`** — no concrete reference points to ground
+  outcome. Output diagnostic: "Route to `ce-brainstorm`; mission
+  has no ground source for sharpening." Exit non-zero.
+- **`single-axis`** — measurable noun present + 1 obvious mechanism.
+  Proceed to Pass 1+ but record `recommended_mode: unilateral` in
+  trace.json. Pass 3 will produce Strategy=1, allowed by rule #16 A
+  v2.17 exception.
+
+Output: `$RUN_DIR/sharpening/pass-0/triage.md` (classification +
+reasoning + rejected_classifications array).
+
+### Bounded reconnaissance
+
+Sharpening runs reconnaissance ONLY within these bounds. Out-of-bound
+scans are forbidden (anti-fabrication: more reconnaissance = more
+authority the LLM can fabricate from weak hits):
+
+- Fuzzy mission text (always)
+- `--target-hint <paths>` flag values, if passed (allowed file reads)
+- Top-3 noun keyword grep across repo (limited to 1 grep invocation
+  per noun; hit count + selected excerpt recorded)
+- Last 200 lines of session history (Claude Code only; codex-cli
+  does not have access — record `session_tail: not_available`)
+
+Forbidden (do not scan): full repo TODOs, CLAUDE.md, full git log,
+unrelated specs.
+
+Each reconnaissance entry recorded in `trace.json.reconnaissance[]`:
+
+```json
+{
+  "command": "grep -nE 'pattern' src/",
+  "hit_count": 7,
+  "selected_excerpt_path": "src/foo.py:42-45",
+  "selected_excerpt_text": "...",
+  "citation_type": "user_message | target_hint | grep_hit | session_tail"
+}
+```
+
+### Pass 1 — Outcome Distillation + Grounding
+
+Input: fuzzy mission + bounded reconnaissance.
+
+peer-A and peer-B each propose ≥2 outcome candidates. Each candidate
+must:
+- Be observable end-state (not process), e.g., "scanner.py emits
+  byte-identical fills via WS replay" not "scanner gets better"
+- Cite ≥1 ground source (file path / user message quote / doc
+  reference) from reconnaissance bounds
+
+Adversary call (locked attack classes for Pass 1):
+- `c1-scope-drift` — does outcome already exceed mission?
+- `c2-hidden-assumption` — what unstated premise must hold?
+
+Mechanical converge predicate (3 conditions, all required):
+1. **`attack_survival`** — no BLOCKER from adversary
+2. **`mission_traceability`** — surviving outcome contains ≥1
+   verbatim or paraphrased phrase from fuzzy mission text
+3. **`rule_16_composability`** — outcome statable as one-line Goal
+   with measurable noun (rule #16 A clause for Goal)
+
+If predicate fails after 2 retries → mutual-KILL → re-run Pass 0
+triage with diagnostic ("might be ungrounded after all"); abort if
+re-triage classifies `fuzzy-ungrounded`.
+
+Output: `pass-1/{peer-A.md, peer-B.md, adversary.txt, converged.md}`.
+Adversary file inherits rule #11 header verbatim with `peer:
+sharpen-pass-1` and `evidence_class: theoretical`.
+
+### Pass 2 — Metric Forge + Runnable Eval
+
+Input: outcome + ground sources.
+
+peer-A and peer-B each propose ≥2 measurable proxies. Each candidate
+must include:
+- Metric `name`, `direction` (min/max), `tolerance` (defaults by type
+  per rule #16 A), `baseline: TBD-measure-at-round-0`
+- **Runnable Eval shell command** (string copy-pasteable). Loop
+  performs a dry-run parse to verify the command emits a number;
+  records `eval_dry_run_parse: {command, exit_code, stdout_tail,
+  parsed_value}` in trace.json.
+- For self-judge mode: rubric path + `Eval ground:` declarations
+  per rule #8
+
+Adversary call:
+- `c3-definition-elasticity` — does proxy mean the same thing across
+  Goal / Metric / Eval / Takeaway?
+- `c4-authority-by-citation` — do referenced files / commands exist?
+
+Converge predicate:
+1. `attack_survival` — no BLOCKER
+2. `mission_traceability` — metric name traceable to mission/outcome
+3. `rule_16_composability` — Eval command parses to a number AND
+   files/commands referenced exist (rule #16 A clauses for Eval +
+   Metric)
+
+Output: `pass-2/{peer-A.md, peer-B.md, adversary.txt, converged.md}`.
+
+### Pass 3 — Lever + Constraint (merged from rounds-1 review per Route A)
+
+Input: metric.
+
+peer-A and peer-B each propose ≥2 mechanisms (Strategy axes). Each
+mechanism includes inline "if you do X, you'll break Y" Constraint
+candidates.
+
+Adversary call:
+- `d4-scope-creep` — does mechanism stretch beyond decision boundary?
+- `c1-scope-drift` — does mechanism exceed outcome?
+
+Constraint extraction is a Pass 3 byproduct: surviving "breaks Y"
+attacks become candidate Constraints. 1 peer-audit pass distinguishes
+real invariants from over-cautious Y.
+
+Converge predicate:
+1. `attack_survival` — no BLOCKER
+2. `mission_traceability` — mechanism traceable to metric
+3. `rule_16_composability` — `Strategy ≥2 surviving axes` (or 1 axis
+   if triage classified `single-axis`, per rule #16 A v2.17 exception)
+   AND Constraints set non-empty
+
+Output: `pass-3/{peer-A.md, peer-B.md, adversary.txt, converged.md}`.
+The converged.md contains BOTH Strategy axes AND Constraints set.
+
+### Pass 4 — Takeaway Derivation (mechanical, no LLM)
+
+Mechanical composition: derive Takeaway 3 fields per rule #16 B from
+Pass 1 outcome + Pass 2 metric + Pass 3 constraints. No LLM call. No
+adversary call.
+
+Mechanical validator (`mechanical_validator_passed`, replaces
+attack_survival for this pass — codex round-2 verdict 1):
+1. **`source_coverage`** — Pass 1 outcome present, Pass 2 metric
+   present, Pass 3 constraints present
+2. **`rule_16_B_quote_grep`** — each Takeaway field's quote-grep
+   against Goal/Eval/Metric/Constraints passes
+3. **`semantic_linkage`** — Success cites Goal+Metric, Validated_by
+   cites Eval/Metric+grep-able/runnable, Constraints cites prohibition
+   (rule #16 B requirements)
+
+If validator fails → route back to Pass 2 with diagnostic ("metric
+proxy failed Takeaway composability"). Pass 2 re-runs with the failure
+context as additional adversary attack class for c3-definition-elasticity.
+
+Output: `pass-4/converged.md`.
+
+### Composition
+
+After all passes converge, the loop assembles a `program.md` draft:
+
+| program.md section | Source |
+|---|---|
+| `## Goal` | Pass 1 outcome restated as one-line goal with Pass 2 metric noun |
+| `## Task class` | Derived from sharpening session (code if Pass 1-3 cited code; else doc/research/audit/decision) |
+| `## Target` | File paths surfaced in Pass 1 grounding + Pass 3 levers |
+| `## Eval` | Pass 2 runnable shell command |
+| `## Eval ground` | (d) verbatim fuzzy_mission as fenced block; (b)/(c) reconnaissance file references |
+| `## Metric` | Pass 2 (with `baseline: TBD-measure-at-round-0`) |
+| `## Constraints` | Pass 3 byproduct |
+| `## Strategy` | Pass 3 surviving axes (≥2 normally; 1 if single-axis triage) |
+| `## Attack Classes` | Derived (default for code; +library based on Task class) |
+| `## Takeaway` | Pass 4 mechanical |
+
+### Rule #16 takeover
+
+After draft composed, sharpening exits and rule #16 round-0 gate runs
+as if the user wrote program.md. Rule #16 step C runs baseline eval
+against Pass 2's runnable Eval command (closes the `TBD-measure-at-round-0`
+placeholder; verified ahead of time via Pass 2 dry-run-parse). Rule
+#16 step E hashes the composed contract.
+
+If rule #16 finds issues (program-adversary BLOCKER, contract hash
+disagreement, etc.), the user can edit the program.md draft manually
+or re-run sharpening with a refined fuzzy mission.
+
+### state.sharpening schema
+
+```json
+"sharpening": {
+  "fuzzy_mission_verbatim": "...",
+  "triage_classification": "fuzzy-but-grounded | sharp | fuzzy-ungrounded | single-axis",
+  "started_at": "...",
+  "passes": [
+    {"n": 0, "name": "triage", ...},
+    {"n": 1, "name": "outcome-grounding", ...},
+    {"n": 2, "name": "metric-eval", ...},
+    {"n": 3, "name": "lever-constraint", ...},
+    {"n": 4, "name": "takeaway-derivation", ...}
+  ],
+  "program_md_draft_path": "...",
+  "trace_json_path": "...",
+  "recommended_flags": ["--mode=co-research" | "--mode=unilateral"]
+}
+```
+
+### trace.json schema (audit trail)
+
+```json
+{
+  "fuzzy_mission_verbatim": "...",
+  "triage": {
+    "classification": "fuzzy-but-grounded",
+    "reasoning": "...",
+    "rejected_classifications": ["sharp", "single-axis", "fuzzy-ungrounded"]
+  },
+  "reconnaissance": [
+    {"command": "...", "hit_count": N, "selected_excerpt_path": "...",
+     "selected_excerpt_text": "...", "citation_type": "user_message"}
+  ],
+  "passes": [
+    {
+      "n": 1,
+      "name": "outcome-grounding",
+      "candidates": [
+        {"id": "outcome-A", "peer": "A", "text": "...",
+         "ground_citations": [...], "verdict": "rejected",
+         "rejected_by": "adversary BLOCKER c2-hidden-assumption"}
+      ],
+      "converge_predicate": {
+        "attack_survival": true,
+        "mission_traceability": true,
+        "rule_16_composability": true
+      },
+      "artifact_integrity": {
+        "path": "pass-1/converged.md",
+        "sha256": "...",
+        "nonce": "...",
+        "started_at": "...",
+        "verdict_line": "...",
+        "model_or_peer": "claude-opus-4.7",
+        "retry_count": 0
+      }
+    },
+    {
+      "n": 2,
+      "name": "metric-eval",
+      "candidates": [...],
+      "converge_predicate": {...},
+      "eval_dry_run_parse": {
+        "command": "python3 bench.py | tail -1",
+        "exit_code": 0,
+        "stdout_tail": "2.34",
+        "parsed_value": 2.34
+      },
+      "artifact_integrity": {...}
+    },
+    {
+      "n": 4,
+      "name": "takeaway-derivation",
+      "mechanical_validator_passed": {
+        "source_coverage": true,
+        "rule_16_B_quote_grep": true,
+        "semantic_linkage": true
+      },
+      "artifact_integrity": {"path": "pass-4/converged.md", "sha256": "...", "model_or_peer": null}
+    }
+  ],
+  "program_md_path": "program.md",
+  "recommended_flags": ["--mode=co-research"]
+}
+```
+
+`artifact_integrity` per pass enables full audit: any reader can
+verify the converged file's hash, the adversary nonce, the model that
+generated it, and the retry count without re-running the protocol.
+
+### Cost
+
+- Pass 0 triage: ~$0.05
+- Pass 1-3: 2 peer + 1 adversary per pass = ~$0.5 each = $1.5
+- Pass 4: $0 (mechanical)
+- v2.17 sharpening total: ~$1.55-2.05
+- + rule #16 round-0 program-adversary: ~$0.10
+- = ~$1.65-2.15 per fuzzy mission
+
+100× ROI on a single 56-round-fuzz catch ($3-5 wasted on
+attack-clean-but-mission-flat rounds).
+
+### Fail-out paths
+
+- Pass 0 outputs `sharp` → exit non-zero, "Already sharp; write
+  program.md directly."
+- Pass 0 outputs `fuzzy-ungrounded` → exit non-zero, "Route to
+  `ce-brainstorm`."
+- Pass 1-3 mutual-KILL after 2 retries → re-run Pass 0 triage with
+  diagnostic. If re-triage outputs `fuzzy-ungrounded` → exit; else
+  retry the failed pass once with re-triage as input.
+- Pass 4 `mechanical_validator_passed` fails → route back to Pass 2
+  with the failure as additional c3-definition-elasticity attack input;
+  re-run Pass 2-3-4. If still fails after 1 retry, escalate to user
+  with diagnostic.
+
+### Empirical anchor
+
+Designed via 2-round co-research with codex (peer-B, gpt-5.5 xhigh):
+- Round 1: 6 attacks (2 BLOCKER + 4 MAJOR + 1 MINOR/MAJOR) + 4 alternative routes
+- Round 2: 4 MAJOR attacks + 6 verdicts + ACCEPT-WITH-FIXES convergence
+
+Full razor history: [TODO.md](TODO.md) "v2.17".

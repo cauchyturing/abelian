@@ -1,16 +1,17 @@
 ---
 name: abelian
-version: 2.16.0
+version: 2.17.0
 description: >
   **Adversarial collaboration framework** (Kahneman-style applied to LLM
   dispatch) for deep, innovative, long-horizon iteration with tractable
   doc and testable metric. Two LLM peers each propose AND challenge each
   other; mutual inspiration between rounds; mechanism-converge termination.
-  16 INVARIANTS rules provide long-horizon scaffolding (file-gate, drift,
+  17 INVARIANTS rules provide long-horizon scaffolding (file-gate, drift,
   nonce, anti-compaction, forbidden termination rationales, mission-thread
-  goal-anchor, evidence-class enum, program-contract gate) — shared
-  substrate with unilateral review frameworks; not abelian-specific.
-  Two iteration modes:
+  goal-anchor, evidence-class enum, program-contract gate, adversarial
+  goal sharpening) — shared substrate with unilateral review frameworks;
+  not abelian-specific. Two iteration modes + opt-in goal-sharpening
+  pre-flight:
 
   - **Co-research mode (default since v2.10, "auto-research-loop")** — two peer
     agents both propose AND challenge each other goal-driven; mutual inspiration
@@ -50,6 +51,20 @@ description: >
   **Target should include executable artifacts whenever possible —
   spec-only is the degraded mode for both modes.**
 
+  **Adversarial Goal Sharpening (v2.17, opt-in, INVARIANTS rule #17)** —
+  for fuzzy missions ("improve trading internal" / "make dashboard
+  better"), `abelian sharpen "<mission>"` runs a 5-pass protocol
+  (triage + outcome distillation + metric forge + lever surfacing +
+  Takeaway derivation) that compiles fuzzy mission to rule
+  #16-compliant program.md draft. Native abelian answer to OKR's
+  hierarchical decomposition: per-program.md-field adversarial sharpening
+  with co-research divergence. Reuses dissect attack classes c1-c4+d4,
+  rule #11 nonce header, peer-A/peer-B framing. After draft → rule #16
+  round-0 gate validates as if user wrote it. Triage exits early on
+  `sharp` (write directly) or `fuzzy-ungrounded` (route to
+  ce-brainstorm); `single-axis` triage allowed via rule #16 A v2.17
+  exception (Strategy=1 + `--mode=unilateral`).
+
   Per-version mechanism details + razor history live in [TODO.md](TODO.md)
   and [README.md](README.md) changelog. SKILL.md description stays
   timeless; changelog rotates.
@@ -59,7 +74,7 @@ description: >
   unilateral verification too despite "research" framing); future v3.0 may flip
   default to co-research once empirical track record validates cost model.
 user-invocable: true
-argument-hint: 'abelian program.md [--chains=C] [--depth=L] [--candidates=M] [--adversary=<dissect|codex|both|off>] [--portfolio=K] [--mode=unilateral] [--code-review=on]'
+argument-hint: 'abelian program.md [--chains=C] [--depth=L] [--candidates=M] [--adversary=<dissect|codex|both|off>] [--portfolio=K] [--mode=unilateral] [--code-review=on] | abelian sharpen "<fuzzy mission>" [--mission-file <path>] [--target-hint <paths>] [--interactive-sharpening]'
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent, Skill
 ---
 
@@ -215,6 +230,121 @@ with a fresh `RUN_ID`. Cheaper to verify the gitignore upfront.
 Add the patterns and commit BEFORE the loop's first round — not as
 part of round 1 — to keep "fixture setup" out of the campaign history.
 
+## Adversarial Goal Sharpening (v2.17, opt-in) — INVARIANTS rule #17
+
+Rule #16 enforces program.md sharpness but rejects fuzzy program.md
+(measurable-noun whitelist, baseline tolerance, Takeaway derivation).
+Rule #17 is abelian's native compiler from fuzzy mission to rule
+#16-compliant program.md draft, opt-in.
+
+Native answer to OKR's hierarchical decomposition: **per-program.md-field
+adversarial sharpening with co-research divergence**. Reuses dissect
+attack classes, rule #11 nonce header, peer-A/peer-B framing — turns
+abelian's own machinery onto goal-authoring itself.
+
+### Trigger
+
+```bash
+abelian sharpen "<fuzzy mission>"                # string mode
+abelian sharpen --mission-file <path>            # file mode
+abelian sharpen "..." --target-hint <paths>      # bound reconnaissance
+abelian sharpen "..." --interactive-sharpening   # 5 mini-confirms (one per pass)
+```
+
+File auto-detect: `abelian <existing-file>` where the file LACKS a
+`## Goal` section → orchestrator prompts "this looks like a draft, not
+a program.md. Run sharpening to compose it? (yes / no)". Bare strings
+to `abelian` are NEVER auto-classified as fuzzy missions (closes
+typo-as-mission risk; explicit `sharpen` subcommand required).
+
+### Pass 0 — Triage
+
+Single LLM call (~$0.05). Classifies mission:
+
+| Classification | Action |
+|---|---|
+| `sharp` | exit, "Already sharp; write program.md and run `abelian program.md` directly" |
+| `fuzzy-but-grounded` | proceed to Pass 1 |
+| `fuzzy-ungrounded` | exit, "Route to `ce-brainstorm`; no ground sources for sharpening" |
+| `single-axis` | proceed; record `recommended_mode: unilateral`; rule #16 A v2.17 exception allows Strategy=1 |
+
+### Passes 1-4 (file-gated co-research, rule #11 inherited)
+
+Each pass writes `pass-N/{peer-A.md, peer-B.md, adversary.txt, converged.md}`.
+Adversary header: `ABELIAN-ADV-v1` + `peer: sharpen-pass-N` + `evidence_class: theoretical`.
+
+| Pass | Output | LLM dispatch | Locked attack classes | Converge predicate |
+|---|---|---|---|---|
+| 1 — Outcome Distillation + Grounding | observable end-state + ≥1 ground citation | 2 peer + 1 adversary | c1-scope-drift, c2-hidden-assumption | attack_survival + mission_traceability + rule_16_composability (Goal clause) |
+| 2 — Metric Forge + Runnable Eval | metric (name/direction/tolerance/baseline=TBD) + runnable shell command | 2 peer + 1 adversary + 1 dry-run-parse | c3-definition-elasticity, c4-authority-by-citation | + Eval command parses to number AND files exist |
+| 3 — Lever + Constraint (merged) | ≥2 Strategy axes (or 1 if single-axis) + Constraints (Pass 3 attack byproduct) | 2 peer + 1 adversary | d4-scope-creep, c1-scope-drift | + ≥2 surviving (or 1 if single-axis) |
+| 4 — Takeaway Derivation | mechanical compose Takeaway 3 fields | 0 LLM (pure derivation) | n/a | mechanical_validator_passed: source_coverage + rule_16_B_quote_grep + semantic_linkage |
+
+### Bounded reconnaissance
+
+Sharpening reads ONLY:
+- Fuzzy mission text (always)
+- `--target-hint <paths>` values, if passed
+- Top-3 noun keyword grep across repo (≤1 grep per noun)
+- Last 200 lines of session history (Claude Code only; codex-cli records `not_available`)
+
+Each entry recorded in `trace.json.reconnaissance[]` with `command`,
+`hit_count`, `selected_excerpt_path`, `selected_excerpt_text`,
+`citation_type` (`user_message | target_hint | grep_hit | session_tail`).
+
+Forbidden: full repo TODOs scan, CLAUDE.md scan, full git log,
+unrelated specs. Anti-fabrication discipline — more reconnaissance =
+more authority the LLM can fabricate from weak hits.
+
+### Composition
+
+After Pass 4 converges, sharpening assembles a `program.md` draft from
+pass artifacts (Goal from Pass 1; Eval from Pass 2; Strategy + Constraints
+from Pass 3; Takeaway from Pass 4; Eval ground always includes (d) verbatim
+fuzzy_mission). Draft enters rule #16 round-0 gate as if user wrote it.
+
+### state.sharpening + trace.json
+
+Per-pass `artifact_integrity` (path, sha256, nonce, started_at,
+verdict_line, model_or_peer, retry_count) enables full audit. Pass 2
+adds `eval_dry_run_parse` (verifies the metric command emits a number
+before round-0 gate runs it for real). Full schema in INVARIANTS rule
+#17 sections "state.sharpening schema" and "trace.json schema".
+
+### Cost
+
+| Component | Cost |
+|---|---|
+| Pass 0 triage | ~$0.05 |
+| Pass 1-3 (each: 2 peer + 1 adversary) | ~$1.50 total |
+| Pass 4 (mechanical) | $0 |
+| **v2.17 sharpening total** | **~$1.55-2.05** |
+| + rule #16 round-0 program-adversary | ~$0.10 |
+| **Per fuzzy mission** | **~$1.65-2.15** |
+
+100× ROI on a single 56-round-fuzz catch ($3-5 wasted on
+attack-clean-but-mission-flat rounds).
+
+### Fail-out paths
+
+| Trigger | Action |
+|---|---|
+| Pass 0 → `sharp` | exit, "Already sharp" |
+| Pass 0 → `fuzzy-ungrounded` | exit, "Route to ce-brainstorm" |
+| Pass 1-3 mutual-KILL (2 retries) | re-run Pass 0 triage with diagnostic |
+| Pass 4 mechanical_validator fails | route back to Pass 2 with c3-definition-elasticity input |
+| All retries exhausted | escalate to user with diagnostic; abort |
+
+### Why this and not OKR
+
+OKR (Objective → Key Results → Tasks) is hierarchical decomposition done
+by the user. abelian sharpening is per-field adversarial cycles done by
+LLM peer pair + dissect adversary. In the LLM era, enumerate-and-attack
+leverages model strength (parallel framings, cross-attack, mechanism
+surfacing) where OKR's KR step relies on user cognitive scaffolding.
+night-shift uses OKR as upstream to abelian; v2.17 is the abelian-native
+alternative for users who want to stay within the framework.
+
 ## State Persistence (v2.8) — `$RUN_DIR/state.json`
 
 The loop runs across many rounds and may survive context compaction.
@@ -283,6 +413,28 @@ status changes, eval results, post-campaign escalation review.
     "frame_break_steps_run": []         // ["reject-pool-mining", ...]
   }
 ]
+```
+
+**v2.17 state schema additions** (sharpening block, populated by rule
+#17 Adversarial Goal Sharpening before round_0 if sharpening was
+triggered):
+
+```json
+"sharpening": {
+  "fuzzy_mission_verbatim": "...",
+  "triage_classification": "fuzzy-but-grounded | sharp | fuzzy-ungrounded | single-axis",
+  "started_at": "...",
+  "passes": [
+    {"n": 0, "name": "triage", "files": ["pass-0/triage.md"]},
+    {"n": 1, "name": "outcome-grounding", "converged_to": "...", "files": [...]},
+    {"n": 2, "name": "metric-eval", "converged_to": "...", "files": [...]},
+    {"n": 3, "name": "lever-constraint", "converged_to": "...", "files": [...]},
+    {"n": 4, "name": "takeaway-derivation", "converged_to": "...", "files": [...]}
+  ],
+  "program_md_draft_path": "program.md",
+  "trace_json_path": "$RUN_DIR/sharpening/trace.json",
+  "recommended_flags": ["--mode=co-research"]
+}
 ```
 
 **v2.16 state schema additions** (round_0 block, populated by Program
