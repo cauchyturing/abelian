@@ -1,15 +1,15 @@
 ---
 name: abelian
-version: 2.14.0
+version: 2.15.0
 description: >
   **Adversarial collaboration framework** (Kahneman-style applied to LLM
   dispatch) for deep, innovative, long-horizon iteration with tractable
   doc and testable metric. Two LLM peers each propose AND challenge each
   other; mutual inspiration between rounds; mechanism-converge termination.
-  13 INVARIANTS rules provide long-horizon scaffolding (file-gate, drift,
-  nonce, anti-compaction, forbidden termination rationales) — shared
-  substrate with unilateral review frameworks; not abelian-specific.
-  Two iteration modes:
+  15 INVARIANTS rules provide long-horizon scaffolding (file-gate, drift,
+  nonce, anti-compaction, forbidden termination rationales, mission-thread
+  goal-anchor, evidence-class enum) — shared substrate with unilateral
+  review frameworks; not abelian-specific. Two iteration modes:
 
   - **Co-research mode (default since v2.10, "auto-research-loop")** — two peer
     agents both propose AND challenge each other goal-driven; mutual inspiration
@@ -57,6 +57,34 @@ description: >
   Non-code campaigns declare `task:` field and ≥1 library; tasks with no
   testable metric remain out of scope (positioning preserved: tractable
   doc + testable metric).
+
+  **v2.15 — telos shift to goal-driven co-research**: every round must
+  populate `mission_thread` (rule #14, 7 fields including ≥2
+  candidate_routes the LLM generated this round + selection_reason
+  citing trade-offs); adversary header gains `evidence_class:` enum
+  (rule #15, 6-class ladder from `theoretical` to `live`) so attack
+  scope is per-round explicit; commit-gate gains 3 always-on checks
+  (mission_thread completeness, evidence_class enum, goal-progress
+  required) so attack-survival is necessary but not sufficient for
+  commit; convergence schema rewritten — `adversary-exhausted` and
+  metric-only `plateau` REMOVED as standalone termination conditions,
+  replaced by Frame-break Protocol (5-step mandatory sequence: reject-pool
+  mining, attack-class library escalation, peer framing swap, goal
+  re-paraphrase from current state, cross-peer alternative_routes
+  mining) which fires when adversary-exhausted OR metric stalled OR
+  candidate_routes weak; only `no-proposal-after-K-frame-breaks` after
+  all 5 steps yield no positive-EV route can terminate the loop on
+  exhaustion. Adversary mechanism (rules #1, #7, #11, #13) 100%
+  preserved — every round still spawns isolated adversary with nonce
+  header and attack-class checklist; co-research adversary may
+  additionally write informational `alternative_routes:` (line 273
+  partial relaxation, co-research only). Cashes v2.13's "Adversarial
+  Collaboration Framework" rename out structurally: collaboration is
+  now in commit-gate / convergence / per-round mission anchor, not
+  just marketing copy. Anchor: codex 56-round trading-internal PM
+  dogfood (2026-05-02) where attacks closed clean rounds 30-56 with
+  zero mission metric movement — v2.14 had no mechanism to revert
+  those rounds; v2.15 does.
 
   Use when user says "abelian", "autoloop", "auto-optimize", "run experiments",
   "optimize this", or "Karpathy loop". The skill name is historical (covers
@@ -172,6 +200,85 @@ Valid round `status`: `pending`, `mutated`, `eval-done`, `adversary-done`, `kept
 Update after: every round step transition, every commit, every revert,
 status changes, eval results, post-campaign escalation review.
 
+**v2.15 state schema additions**:
+
+```json
+"frame_break_count_consecutive": 0,
+"rounds": [
+  {
+    ...,
+    "mission_thread": { ... },          // see Mission Thread section
+    "frame_break_fired": false,         // did this round fire frame-break?
+    "frame_break_steps_run": []         // ["reject-pool-mining", ...]
+  }
+]
+```
+
+`frame_break_count_consecutive` resets to 0 on any round with
+`mission_thread.metric_delta > 0` OR `mission_thread.blocker_status
+∈ {removed, partially}`. Increments by 1 on any round that fired
+frame-break. Termination via `no-proposal-after-K-frame-breaks` checks
+this counter against K (default 2).
+
+## Mission Thread per round (v2.15) — INVARIANTS rule #14
+
+Every round populates `state.rounds[N].mission_thread` BEFORE commit-gate
+runs. Missing or incomplete = commit-gate check 8 fails. Schema:
+
+```json
+"mission_thread": {
+  "goal_paraphrase": "fresh paraphrase of program.md Goal, this round",
+  "metric_delta": 0.42,
+  "blocker_status": "removed | partially | blocked_on:<dep> | n/a",
+  "mission_relevance": "one sentence: how this round serves the mission",
+  "candidate_routes": [
+    {"id": "route-a", "mechanism": "...", "est_metric_delta": 0.5,
+     "est_cost": "cheap | medium | expensive", "blocker_chain": null},
+    {"id": "route-b", "mechanism": "...", "est_metric_delta": 0.2,
+     "est_cost": "medium", "blocker_chain": "blocker-X"}
+  ],
+  "selected_route_id": "route-a",
+  "selection_reason": "route-a est highest delta; route-b cheaper but
+                       smaller delta; route-c blocked-on integration
+                       not yet available",
+  "exploration_round": false
+}
+```
+
+Field rules and rationale: see INVARIANTS rule #14 (full schema +
+why-each-field). Key constraints commit-gate enforces (rule #2 check 8):
+
+- `candidate_routes` length ≥ 2 (single-route round = gate-fail)
+- `goal_paraphrase` ≠ `state.rounds[N-1].mission_thread.goal_paraphrase`
+  (string-equality check; identical paraphrase = mutator did not re-read
+  program.md = gate-fail)
+- `selection_reason` references at least one unpicked route by id
+  ("picked highest est delta" alone = gate-fail)
+
+Goal-progress check (rule #2 check 10): at least ONE of `metric_delta > 0`,
+`blocker_status ∈ {removed, partially}`, or `exploration_round: true`
+with `state.frame_break_count_consecutive ≤ 2`.
+
+**Mutator workflow per round**:
+
+1. Re-read program.md (forced by check 8's freshness constraint).
+2. Survey state.rounds[*].mission_thread.candidate_routes for unpicked
+   routes from prior rounds (reject-pool warm-start; mandatory in
+   Frame-break Protocol step 1, optional in normal rounds).
+3. Generate ≥2 candidate_routes for THIS round, document mechanism +
+   est_metric_delta + est_cost + blocker_chain for each.
+4. Select one, write selection_reason citing trade-offs.
+5. Implement selected route (existing Loop steps 2-7).
+6. Populate metric_delta and blocker_status from eval and round outcome
+   BEFORE commit-gate.
+
+**Why this exists**: codex 56-round trading-internal PM dogfood
+(2026-05-02) demonstrated that without a per-round goal-anchor, the
+loop produced 26 consecutive attack-clean rounds with zero mission
+metric movement. Mission Thread makes goal-relevance a structural
+per-round artifact verified by commit-gate; rounds that don't earn
+their commit by goal-progress evidence are reverted.
+
 ## Search Shape (v2.4) — C × L × Candidates
 
 Default: **C=1, L=1, candidates=1** — one mutation per round, sequential. The Loop section below describes this case; most campaigns run here and should not bump these levers without cause.
@@ -230,9 +337,12 @@ Per-round cost shape:
 ```
 
 **No `--rounds` / `--budget` flag**. Abelian runs **till converge** per
-INVARIANTS rule #6 (goal-met / adversary-exhausted / plateau / mutual-KILL).
-Manual abort: send SIGINT (Ctrl+C) → `status=interrupted` + handoff.
-See "Termination Discipline" below for the rationale.
+INVARIANTS rule #6 (v2.15: goal-met / no-proposal-after-K-frame-breaks /
+mutual-KILL). `adversary-exhausted` and metric-only `plateau` are NOT
+standalone termination conditions in v2.15 — they trigger Frame-break
+Protocol (see "Frame-break Protocol" section) instead of stopping the
+loop. Manual abort: send SIGINT (Ctrl+C) → `status=interrupted` +
+handoff. See "Termination Discipline" below for the rationale.
 
 ## The Loop
 
@@ -243,7 +353,13 @@ For each round:
 2. **Mutate** — apply the change (minimal, one idea per round). Before writing, snapshot pre-files: `mkdir -p $RUN_DIR/round-N && { git ls-files -z; git ls-files -z --others --exclude-standard; } | sort -zu > $RUN_DIR/round-N/pre-files.txt`. INVARIANTS rule #5.
 3. **Evaluate** — run eval command, or self-judge against frozen rubric. Write metric value to `$RUN_DIR/round-N/eval.txt` and update `state.rounds[N].metric_value`.
 4. **Adversary** — spawn `Agent(general-purpose)` that runs `Skill('dissect')` on the diff + eval output. Adversary subagent MUST write full attack list (or `n/a-this-target` per class) to `$RUN_DIR/round-N/adversary.txt` BEFORE returning, and the verdict line MUST be recorded in `state.rounds[N].verdict_line`. INVARIANTS rules #1, #7. (See Adversary section.)
-5. **Confirm** — no attacks: run commit-gate (INVARIANTS rule #2, 7 checks: `adversary.txt` non-empty + header block nonce matches `state.adversary_nonce` + mtime in `(adversary_started_at, now)` + verdict_line `grep -qF` in body + drift check + `pre-files.txt` exists + eval value matches state). **If `--code-review=on`** (rule #12), also run `codex review --uncommitted -c 'model_reasoning_effort="high"'` and add 8th check: `codex-review.txt` non-empty AND no `[P1]`/`[P2]` markers. All checks pass → `git commit`. Any fail → revert (`git checkout` + scoped clean of new files via pre/post diff), mark round `gate-failed`. With attacks: convert each to a verification (regression test, worst-case benchmark input, or added rubric criterion) and re-eval. Any verification fails → revert. Black-box eval with no augmentation surface: log attack as `provisional-flag`, keep but mark.
+5. **Confirm** — no attacks: run commit-gate (INVARIANTS rule #2, **10 always-on checks + 1 conditional**, v2.15):
+   1–7: `adversary.txt` non-empty + header block nonce matches `state.adversary_nonce` + mtime in `(adversary_started_at, now)` + verdict_line `grep -qF` in body + drift check + `pre-files.txt` exists + eval value matches state.
+   **8 (v2.15, rule #14)**: `state.rounds[N].mission_thread` complete (7 fields populated, ≥2 candidate_routes, goal_paraphrase ≠ prior round's, selection_reason references at least one unpicked route).
+   **9 (v2.15, rule #15)**: adversary header `evidence_class:` field present and in whitelist (`theoretical | paper | replay | settled | dry_run | live`); both peer-A and peer-B in co-research.
+   **10 (v2.15, rule #14)**: goal-progress required — `mission_thread.metric_delta > 0` OR `blocker_status ∈ {removed, partially}` OR (`exploration_round=true` AND `state.frame_break_count_consecutive ≤ 2`). Pure attack-survival with `metric_delta=0 AND blocker=n/a AND exploration=false` is gate-fail.
+   **11 (conditional, rule #12)**: when `--code-review=on`, run `codex review --uncommitted -c 'model_reasoning_effort="high"'` → `codex-review.txt` non-empty AND no `[P1]`/`[P2]` markers.
+   All checks pass → `git commit`. Any fail → revert (`git checkout` + scoped clean of new files via pre/post diff), mark round `gate-failed`. With attacks: convert each to a verification (regression test, worst-case benchmark input, or added rubric criterion) and re-eval. Any verification fails → revert. Black-box eval with no augmentation surface: log attack as `provisional-flag`, keep but mark.
 6. **Place** — K=1 mode: replace champion if better, else revert. K>1 mode: replace THIS cell's incumbent only if it beats that cell's score. New cell label → seed that cell.
 7. **Record** — append to History: kept/reverted/error, cell, adversary-result, metric delta.
 8. **Adapt** — 5 consecutive reverts → shift strategy. 5 rounds with no new cell filled (K>1) → write to `escalations.md`. All directions exhausted → stop early.
@@ -270,9 +386,15 @@ Override via `--adversary=<value>`:
 
 **Header-block protocol (v2.8 anti-fabrication).** Before each adversary call, the mutator generates a fresh `nonce` (16 hex via `secrets.token_hex(8)`) and `started_at` (ISO ms) and writes both into `state.rounds[N].{adversary_nonce, adversary_started_at}`. The prompt instructs the subagent to write a mandatory header block (`ABELIAN-ADV-v1` + run_id + round + peer + nonce + started_at + verdict, then `---`, then attacks) as the first lines of the output file. Commit-gate verifies nonce match + mtime in valid range + verdict in body. INVARIANTS rule #11. This is friction-level defense (not cryptographic) targeting Threat-1: post-compaction "forgot to call adversary" silent fabrication. A mutator must now cat state.json to find the nonce, which triggers cat INVARIANTS, which surfaces "must actually call adversary."
 
-**Adversary's job:** find what breaks, NOT propose alternatives. Cannot endorse, only attack.
+**Adversary's job (unilateral mode):** find what breaks, NOT propose alternatives. Cannot endorse, only attack.
 
-**Code Review supplemental layer (`--code-review=on`, v2.11+)**: orthogonal to the adversary call above, abelian can run codex CLI's purpose-built `codex review --uncommitted` as an additional gate before commit (INVARIANTS rule #12). This is a code-quality layer using codex's built-in P1/P2/P3 severity schema — different from rule #1's domain-specific attack-class adversary. Output to `round-N/codex-review.txt` (no header block — rule #11 does not apply to this file). Commit-gate adds 8th check when enabled: no `[P1]`/`[P2]` markers in codex-review.txt. Use for ship-prep, PR-level decisions, security-sensitive mutations. Default off because cost roughly doubles per round.
+**Adversary's job (co-research mode, v2.15):** find what breaks AND optionally write an informational `alternative_routes:` section at end of attacks (after `---`-delimited attack content). Alternative routes are **non-binding** (commit-gate ignores their content; rule #11 header-block validation does not extend to this section), but **readable** by the next round's mutator/peer when generating `mission_thread.candidate_routes` (rule #14 reject-pool mining + Frame-break Protocol step 5). Schema per rule #11 (each entry has `id`, `mechanism`, `est_metric_delta`, `rationale`).
+
+The unilateral-mode prohibition stands because (a) unilateral has no peer to consume alternative routes, and (b) without a peer's review, adversary-as-proposer reintroduces the propose-attack collapse v2.6 was designed to prevent. Co-research mode has both safeguards: the OTHER peer's adversary call independently attacks any mutation derived from these alternative routes.
+
+**Why this is the right partial-relaxation**: the line-273 ban (v2.0+) prevented adversary-collapse to "all-KILL" by structurally separating roles. v2.15 keeps the role separation in the binding gate (alternative_routes does NOT count as a verdict; the verdict line is still attack-only) while allowing the adversary to contribute creative direction signal that the next round MAY mine. This is the difference between "stuck adversary" and "co-researcher offering a different angle." Codex 56-round PM dogfood (2026-05-02) showed the adversary-as-only-attacker telos exhausts itself within frame; allowing informational propose lets the loop break frame at the source where stuck-ness was first detected.
+
+**Code Review supplemental layer (`--code-review=on`, v2.11+)**: orthogonal to the adversary call above, abelian can run codex CLI's purpose-built `codex review --uncommitted` as an additional gate before commit (INVARIANTS rule #12). This is a code-quality layer using codex's built-in P1/P2/P3 severity schema — different from rule #1's domain-specific attack-class adversary. Output to `round-N/codex-review.txt` (no header block — rule #11 does not apply to this file). Commit-gate adds the conditional check (rule #2 check 11 in v2.15 numbering, formerly check 8 in v2.14) when enabled: no `[P1]`/`[P2]` markers in codex-review.txt. Use for ship-prep, PR-level decisions, security-sensitive mutations. Default off because cost roughly doubles per round.
 
 **Graceful degradation (loud, never silent):**
 - `--adversary=codex` + codex CLI unavailable (binary missing OR `~/.codex/auth.json` absent OR codex MCP wrapper not configured) → degrade to `dissect`, **write notice in 3 places**: console (stderr), `abelian/escalations.md`, and History row for the affected rounds. Continue loop.
@@ -283,7 +405,9 @@ Override via `--adversary=<value>`:
 
 **Honest limit:** Default `dissect` breaks structural self-collapse but does NOT break model-family collapse. Two Claudes with role split still share RLHF priors. For high-stakes decisions, `--adversary=codex` is the cross-model upgrade — don't default-trust the default.
 
-Termination = "adversary exhausted attacks across N rounds," not "metric stopped improving alone." This is the structural anti-collapse: there's no vocabulary for "agree to stop." **v2.5 refinement**: "exhausted" must be measured ACROSS the Attack Class Checklist below, not within a single adversary's frame — single-adversary single-frame exhaustion ≠ attack-space exhaustion.
+**v2.15 termination shift**: termination is no longer "adversary exhausted across N rounds." Adversary-exhausted is now an **informational signal** that triggers Frame-break Protocol (5-step mandatory creative-escape sequence; see "Frame-break Protocol" section). Only after K consecutive frame-break rounds yield no positive-EV `candidate_route` does the loop terminate via `no-proposal-after-K-frame-breaks`. Termination conditions per rule #6: `goal-met | no-proposal-after-K-frame-breaks | mutual-KILL | user-interrupt`.
+
+**Why this changed (v2.15)**: codex 56-round trading-internal PM dogfood (2026-05-02) showed attack-survival as standalone gate produces "attack PASS, mission metric flat" rounds indefinitely. v2.14 had no mechanism to flag this; every commit was gate-clean. v2.15 makes goal-progress a structural commit-gate check (rule #2 check 10) and removes adversary-exhausted from termination — attack mechanism is 100% preserved (every round still runs adversary with nonce header per rule #11 and attack-class checklist), but attacks no longer terminate the loop on their own. **v2.5 refinement still applies**: when adversary-exhausted DOES contribute to a frame-break trigger, "exhausted" still means measured ACROSS the Attack Class Checklist — single-adversary single-frame exhaustion is not even enough to trigger frame-break, let alone terminate.
 
 **v2.6 fundamental upgrade — Co-Research Mode**: unilateral attack-only is
 itself a collapse vector when the work involves discovery, not just
@@ -488,23 +612,37 @@ docs, plan files, decision recs, research-output writeups.
 executable specs (use research-class + execution gate per rule #9), data
 analysis output (use research-class + audit-class).
 
-### Goal-driven termination (replaces adversary-exhaustion)
+### Goal-driven termination (v2.15 — applies to BOTH modes now)
 
-Co-research terminates on:
-1. **Goal met** — champion eval ≥ target → DONE.
-2. **Plateau + diversity collapse** — N consecutive rounds with no eval
-   improvement AND candidate edit-distance falling → ESCALATE + STOP.
-   This is the structural anti-collapse: if both agents are converging
-   on similar mutations AND the metric isn't moving, the loop has
-   exhausted productive disagreement, not attack space.
-3. **Mutual KILL deadlock** — N rounds where both agents' mutations
-   revert to baseline (every attack succeeds on both sides) → ESCALATE
-   ("the goal as framed may be impossible / requires architecture change").
+v2.15 unifies the termination schema across unilateral and co-research
+(previously, co-research had its own narrower set; v2.15 extends the
+co-research telos to unilateral and adds Frame-break Protocol as the
+shared creative-escape mechanism).
 
-Adversary-exhausted alone is **NOT** a termination condition in co-research
-mode. Without active proposals from both peers, "no attacks left" is
-indistinguishable from "no proposals left to attack." Goal-fitness +
-diversity are the dual termination signals.
+Both modes terminate on (per INVARIANTS rule #6):
+
+1. **Goal met** — eval ≥ target (unilateral) OR champion eval ≥ target
+   (co-research) → DONE.
+2. **No-proposal-after-K-frame-breaks** — `state.frame_break_count_consecutive
+   ≥ K` (default K=2) AND the most recent Frame-break Protocol run
+   yielded no `candidate_routes` entry with `est_metric_delta > 0`
+   despite executing all 5 frame-break steps. This is the v2.15
+   "creative exhaustion" termination — the LLM has tried both its
+   primary frame and 5 expansions and still cannot generate a
+   positive-EV next step. **Plateau-on-metric and adversary-exhausted
+   alone do NOT terminate**; they trigger Frame-break Protocol instead.
+3. **Mutual KILL deadlock** (co-research only) — N=3 rounds where both
+   agents' mutations revert to baseline (every attack succeeds on both
+   sides) → ESCALATE ("the goal as framed may be impossible / requires
+   architecture change").
+4. **User interrupt** — SIGINT/SIGTERM → `status=interrupted`, finish
+   current atomic operation, write handoff, exit.
+
+`adversary-exhausted` and `metric-plateau-alone` are explicitly NOT
+termination conditions in v2.15 (either mode). They are signals that
+trigger Frame-break Protocol. See "Frame-break Protocol" section
+below for the 5-step creative-escape sequence the loop runs BEFORE
+declaring `no-proposal-after-K-frame-breaks`.
 
 ### Cost vs unilateral
 
@@ -525,6 +663,170 @@ overhead for substantially better diversity coverage.
 - Single-axis optimization with one obvious mechanism (no diversity
   to leverage)
 - Cost-sensitive batch (cron jobs, nightly sweeps) — unilateral is cheaper
+
+## Frame-break Protocol (v2.15) — creative escape, not termination
+
+When a round looks "stuck" — adversary returns no attacks, OR
+metric_delta is ≤ 0, OR all candidate_routes have est_metric_delta ≤
+0 — v2.14 would have called this plateau or adversary-exhausted and
+terminated the loop. v2.15 instead treats stuck-ness as the **exact
+moment LLM creative capacity should fire**, not the moment to give
+up. The loop runs Frame-break Protocol BEFORE any termination claim.
+
+### Trigger conditions
+
+Frame-break fires (sets `state.rounds[N].frame_break_fired = true` and
+increments `state.frame_break_count_consecutive`) when ANY of:
+
+1. Adversary verdict is `no-attacks` for the round (proxy for
+   adversary-exhausted, single round)
+2. `mission_thread.metric_delta ≤ 0` AND `blocker_status ∉ {removed,
+   partially}`
+3. All entries in `mission_thread.candidate_routes` have
+   `est_metric_delta ≤ 0` (or all marked `unknown` outside an
+   exploration-round chain ≤ 2)
+
+Resetting: `frame_break_count_consecutive = 0` whenever a subsequent
+round produces `metric_delta > 0` OR `blocker_status ∈ {removed,
+partially}`. The counter measures *consecutive* exhaustion only.
+
+### The 5 mandatory steps (in order, all must run before declaring no-proposal)
+
+When triggered, BEFORE the round's final state is written and BEFORE
+considering termination, the mutator MUST execute:
+
+**Step 1 — Reject-pool mining**
+
+Scan `state.rounds[*].mission_thread.candidate_routes` (all prior rounds,
+all peers in co-research). Surface the top-3 unselected routes ranked by
+`est_metric_delta > 0`. Promote them to the current round's
+`candidate_routes` (de-duped against existing entries by mechanism
+similarity). Record in `state.rounds[N].frame_break_steps_run` with
+the source rounds.
+
+Why: best-of-M historically discarded M-1 with no inheritance. Frame-break
+treats the discard pool as warm-start fuel.
+
+**Step 2 — Attack-class library escalation**
+
+Load 1 additional attack-class library not currently in program.md
+Attack Classes from abelian's library set (default-7, doc-class,
+research-class, audit-class, decision-class, code-domain extensions —
+whichever is most cross-domain to the current Task class). Re-spawn
+the adversary with the expanded class list and an explicit "find
+attacks the prior frame missed because it didn't have these classes"
+prompt. Write to `$RUN_DIR/round-N/adversary-frame-break.txt` with
+its own nonce header (rule #11 applies).
+
+Why: codex 2026-04-26 P0 audit dogfood — dissect declared exhausted
+but missed `subprocess command injection` because the class wasn't in
+its frame. Frame-break expands the frame.
+
+**Step 3 — Peer framing swap (co-research mode only)**
+
+Swap peer-A's and peer-B's context-framing for the next round's
+proposal step. Examples:
+- A=optimist/B=auditor → B=optimist/A=auditor
+- A reads Strategy axes 1,3,5 → reads 2,4,6 next round
+- A starts top-down → starts bottom-up
+- A "smallest fix" → "most robust fix"
+
+If unilateral mode, skip this step (no peer to swap with), record
+`step-3: skipped (unilateral)` in `frame_break_steps_run`.
+
+Why: same context-framing two rounds in a row produces same RLHF prior
+output. Forced swap surfaces the framing-locality of the stuck-ness.
+
+**Step 4 — Goal re-paraphrase from current state**
+
+Re-read program.md Goal verbatim, then prompt mutator to write a fresh
+`goal_paraphrase` for next round based on "where we currently are vs
+the goal" rather than re-hashing the original framing. The paraphrase
+MUST cite the current metric value and the gap to target. Allow up to
+N=2 speculative routes (`est_metric_delta: "unknown"`) to seed
+exploration; this exploration window is bounded by the
+`exploration_round=true` constraint and `frame_break_count_consecutive
+≤ 2` guard in commit-gate check 10.
+
+Why: original program.md framing may be exhausted but a re-paraphrase
+from current state surfaces unknown-unknown directions. The bounded
+exploration window prevents the loop from becoming pure exploration.
+
+**Step 5 — Cross-peer alternative_routes mining (co-research mode only)**
+
+For each peer, read the OTHER peer's most recent `peer-X.txt`
+informational `alternative_routes:` section (line 273 partial
+relaxation product). Promote any route with `est_metric_delta > 0`
+to the next round's `mission_thread.candidate_routes` for THIS peer.
+Record in `frame_break_steps_run`.
+
+If unilateral mode, skip (no peer to mine), record `step-5: skipped
+(unilateral)` in `frame_break_steps_run`.
+
+Why: bonus prompt edit to line 273 lets co-research adversary suggest
+informational routes; without a mining step, that signal would be
+unused. Frame-break makes it consumed.
+
+### Termination via no-proposal-after-K-frame-breaks
+
+Only after ALL applicable steps run (steps 1, 2, 4 always; steps 3 and
+5 in co-research mode) AND the resulting `mission_thread.candidate_routes`
+for the next round contains zero entries with `est_metric_delta > 0`
+AND this state has held for `frame_break_count_consecutive ≥ K`
+(default K=2) → terminate with `status=completed`,
+`termination.condition = "no-proposal-after-K-frame-breaks"`.
+
+This is the v2.15 "creative exhaustion" termination. It is materially
+stricter than v2.14's `adversary-exhausted` because it requires the LLM
+to have demonstrably tried 5 forms of frame-breaking and still found
+nothing. K=2 (consecutive) means the loop must have failed to escape
+on at least 2 different rounds with full frame-break sequences before
+giving up.
+
+### Why not just "stop on plateau"
+
+Stopping on plateau = telling the LLM "your creative capacity is
+bounded by the current frame's vocabulary." Frame-break encodes the
+opposite: "your creative capacity is precisely for breaking frames;
+plateau is when you should fire it, not when you should give up."
+
+Plateau-as-termination was a v1.x adversarial-loop inheritance: in
+optimization, plateau is gradient-zero, stop. In adversarial, plateau
+is no-attack-lands, stop. In **goal-driven co-research**, plateau is
+"current frame's candidate pool exhausted, time to escape frame." The
+escape mechanism is the 5-step protocol; only when the LLM has tried
+all 5 and can produce no positive-EV route is exhaustion real.
+
+### Cost
+
+Frame-break adds ~1× round cost when fired (one extra adversary call
+in step 2, no extra eval). With K=2 default, the worst-case overhead
+above v2.14 termination is ~2 extra rounds × ~1× round = ~2 round-equivalents
+before terminate. In return, the loop catches "we're stuck within the
+frame, what other frames are there?" — the exact failure mode codex's
+56-round PM dogfood demonstrated v2.14 could not catch.
+
+### State.json frame-break trace
+
+```json
+"frame_break_count_consecutive": 1,
+"rounds": [
+  ...,
+  {
+    "n": 27,
+    "frame_break_fired": true,
+    "frame_break_steps_run": [
+      "step-1: mined 2 routes from rounds 12, 19",
+      "step-2: escalated to research-class library, found 1 new attack",
+      "step-3: skipped (unilateral)",
+      "step-4: re-paraphrased goal from current metric (0.42 vs target 0.8)",
+      "step-5: skipped (unilateral)"
+    ],
+    "mission_thread": { ... },
+    "verdict_line": "1 attack found via library escalation"
+  }
+]
+```
 
 ## Attack Class Checklist (v2.5)
 
@@ -716,47 +1018,43 @@ deliberate claim. Prevents the silent kicked-down-the-road items (e.g.,
 P0-audit campaign 2026-04-26 had 4 deferred items in compound doc but
 escalations.md was empty — wrong place, wrong visibility for reviewers).
 
-## Termination Discipline (v2.9)
+## Termination Discipline (v2.15 rewrite of v2.9)
 
 Abelian runs **till converge**. There is no `--rounds` cap, no `--budget` flag, no wallclock cap. A loop's termination claim is valid only if backed by mechanism, not preference. INVARIANTS rule #6 enumerates 5 forbidden rationales — "diminishing returns", "time/token remaining", "deferred to next session", "foundation in place", "cleaner to ship". These are stopping preferences disguised as conclusions; treat them as hard refusals.
 
-Valid termination conditions (N=3 hardcoded internal default for plateau/exhaustion thresholds):
+**v2.15 telos shift**: termination requires goal-progress evidence OR creative exhaustion (Frame-break Protocol fired without yielding a positive-EV route), NOT adversary-exhaustion alone. The loop's goal is goal-fulfillment, not attack-survival. Adversary mechanism is preserved (every round still runs adversary with nonce header per rule #11 + attack-class checklist), but adversary-exhausted no longer terminates by itself — it triggers Frame-break Protocol, which is the LLM's creative-escape opportunity.
+
+Valid termination conditions (v2.15, K=2 default for frame-break exhaustion threshold):
 
 - **Goal met** — eval ≥ target (unilateral) OR champion ≥ target (co-research)
-- **Adversary exhausted across all attack classes for N=3 consecutive rounds** + execution gate satisfied (INVARIANTS rule #9). Each attack class in the program.md checklist addressed with no concrete attack across N rounds.
-- **Plateau** — N=3 consecutive rounds with no eval improvement. Co-research mode additionally requires diversity collapse (candidate edit-distance falling between peer mutations).
-- **Mutual KILL deadlock** — N=3 rounds where every peer attack succeeds on both sides (co-research only).
+- **No-proposal-after-K-frame-breaks** — `state.frame_break_count_consecutive ≥ K` (default K=2) AND the most recent Frame-break Protocol run yielded no `mission_thread.candidate_routes` entry with `est_metric_delta > 0` despite executing all 5 mandatory frame-break steps. This is the "creative exhaustion" termination — the LLM has demonstrably tried both its primary frame and 5 frame-break expansions without finding a positive-EV next step. See "Frame-break Protocol" section.
+- **Mutual KILL deadlock** (co-research only) — N=3 rounds where both agents' mutations revert to baseline (every attack succeeds on both sides). Escalates with "the goal as framed may be impossible / requires architecture change."
 
-If a mechanism signal would not fire by round 3, the loop has not actually converged. Either tighten the program.md target/eval or wait for the user to abort manually.
+**v2.15 removed conditions** (compared to v2.14):
+- ~~**Adversary exhausted across attack classes for N=3 consecutive rounds**~~ — REMOVED as standalone termination. Now triggers Frame-break Protocol; only after K consecutive frame-breaks fail does the loop terminate via no-proposal-after-K-frame-breaks. This closes the v2.14 failure mode where attack-survival could substitute for goal-progress.
+- ~~**Plateau (metric stopped improving alone)**~~ — REMOVED as standalone termination. Now triggers Frame-break Protocol. Plateau is the moment the LLM should creatively escape, not give up.
+
+If a mechanism signal would not fire by round 3+K=5, the loop has not actually converged. Either tighten the program.md target/eval or wait for the user to abort manually.
 
 **Manual abort path** (not a termination condition, an emergency stop):
 - User sends SIGINT (Ctrl+C) or SIGTERM
 - Abelian marks `state.status = "interrupted"`, finishes the current round's atomic operation if mid-commit (per night-shift's "finish current task" pattern), writes handoff/compound-doc with explicit interrupted marker, exits.
 
-**Self-check before terminating** (mandatory): re-read INVARIANTS rule #6 from disk (rule #3) and verify your claimed reason is on the valid list, not the forbidden list. Document the rule-#6 self-check in `state.termination` block:
+**Self-check before terminating** (mandatory): re-read INVARIANTS rule #6 from disk (rule #3) and verify your claimed reason is on the v2.15 valid list, not the forbidden list. Document the rule-#6 self-check in `state.termination` block:
 
 ```json
 "termination": {
-  "condition": "goal-met | adversary-exhausted | plateau | mutual-KILL | interrupted",
-  "evidence": "<verbatim quote from eval/adversary/state>",
-  "rounds_at_termination": 7,
+  "condition": "goal-met | no-proposal-after-K-frame-breaks | mutual-KILL | interrupted",
+  "evidence": "<verbatim quote from eval/adversary/state — for no-proposal, must cite frame_break_count_consecutive and last frame-break run's empty positive-EV route list>",
+  "rounds_at_termination": 12,
+  "frame_break_count_consecutive": 2,
   "rule6_self_check": "<one sentence — which forbidden rationale was tempting and why it does not apply>"
 }
 ```
 
 If you cannot fill `rule6_self_check` with a substantive answer, you are about to terminate on a preference. Run another round.
 
-**Self-check before terminating** (mandatory): re-read INVARIANTS rule #6 from disk (rule #3) and verify your claimed reason is on the valid list, not the forbidden list. Document the rule-#6 self-check in `state.termination` block:
-
-```json
-"termination": {
-  "condition": "goal-met | adversary-exhausted | plateau | mutual-KILL | cap-fired",
-  "evidence": "<verbatim quote from eval/adversary/state>",
-  "rule6_self_check": "<one sentence — which forbidden rationale was tempting and why it does not apply>"
-}
-```
-
-If you cannot fill `rule6_self_check` with a substantive answer, you are about to terminate on a preference. Run another round.
+If terminating via `no-proposal-after-K-frame-breaks`, the `evidence` field MUST include the most recent round's `frame_break_steps_run` array showing all applicable steps actually executed. Termination claim with `frame_break_count_consecutive < K` or with empty `frame_break_steps_run` is gate-fail (loop refuses to terminate).
 
 ## When It Ends: Auto-Compound
 

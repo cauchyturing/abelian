@@ -26,16 +26,21 @@ The codex session you just launched becomes the **mutator + orchestrator**. For 
 4. Adversary      — spawn `codex exec` subprocess(es) with prompts/dissect.md template +
                     fresh nonce + ISO timestamp; subagent writes adversary.txt with
                     mandatory ABELIAN-ADV-v1 header (rule #11), returns verdict line
-5. Commit-gate    — 7 checks (rule #2). All pass → git commit. Any fail → revert.
-6. Place / Record / Adapt
-8. Terminate      — when goal-met / adversary-exhausted N=3 / plateau N=3 / mutual-KILL N=3
+5. Commit-gate    — 10 always-on + 1 conditional checks (rule #2, v2.15). All pass → git commit. Any fail → revert.
+                     Always-on 8/9/10 (v2.15): mission_thread completeness (#14), evidence_class enum (#15), goal-progress required (#14).
+6. Place / Record / Adapt + populate state.rounds[N].mission_thread (rule #14: goal_paraphrase fresh, ≥2 candidate_routes, selection_reason citing trade-offs)
+7. Frame-break Protocol — if adversary verdict no-attacks OR metric_delta ≤ 0 OR all candidate_routes est_metric_delta ≤ 0:
+                     fire 5 mandatory steps (reject-pool mining, attack-class library escalation, peer framing swap if co-research,
+                     goal re-paraphrase from current state, cross-peer alternative_routes mining if co-research) BEFORE termination.
+                     state.frame_break_count_consecutive increments; resets on any subsequent productive round.
+8. Terminate      — when goal-met / no-proposal-after-K-frame-breaks (K=2 default) / mutual-KILL N=3 / interrupted (v2.15)
 ```
 
 codex maintains state.json via `jq`, generates nonces via `python3 -c "import secrets; ..."`, runs git ops directly, and dispatches adversary subagents via `codex exec`. No wrapper is needed because codex already has shell access to all of this.
 
 ## Code Review supplemental gate (`--code-review=on`, v2.11+)
 
-When the orchestrator's prompt enables `--code-review=on` (INVARIANTS rule #12), each round runs an additional `codex review --uncommitted -c 'model_reasoning_effort="high"'` after the adversary call and before the commit-gate. The codex review's `[P1]/[P2]/[P3]` severity output goes to `round-N/codex-review.txt`; commit-gate's 8th check refuses the commit if `[P1]` or `[P2]` markers are present. This is a code-quality layer (codex's built-in review prompt) supplemental to rule #1's domain-specific dissect adversary.
+When the orchestrator's prompt enables `--code-review=on` (INVARIANTS rule #12), each round runs an additional `codex review --uncommitted -c 'model_reasoning_effort="high"'` after the adversary call and before the commit-gate. The codex review's `[P1]/[P2]/[P3]` severity output goes to `round-N/codex-review.txt`; commit-gate's conditional check 11 (in v2.15 numbering, formerly check 8 in v2.14) refuses the commit if `[P1]` or `[P2]` markers are present. This is a code-quality layer (codex's built-in review prompt) supplemental to rule #1's domain-specific dissect adversary.
 
 `--code-review` requires the same codex CLI install + auth as `--adversary=codex`. If `node` is not in PATH, prefix with `bun /path/to/codex` per the bun-shim convention. Default off because per-round cost roughly doubles.
 

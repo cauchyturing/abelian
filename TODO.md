@@ -103,7 +103,7 @@ features remain considered for borrow. Priority by abelian-fit:
 **Medium priority**:
 - **Eval evidence completeness check** (NS Inner 4 reframed) — embed in step 3 Eval rather than separate step (peer-B F2.3 self-attack 学到): require deliverable existence + UI screenshot for UI tasks.
 - **Subagent delegation rules** — co-research peer dispatch prompts MUST include "you may NOT git add/commit, you may NOT modify outside Target". Currently implicit.
-- **Mid-run direction propose + adversary review** (NS #2/#3) — Strategy in program.md is pre-fixed; long-horizon innovative task may benefit from "round N: should we revise direction?" with adversary review.
+- ~~**Mid-run direction propose + adversary review**~~ (NS #2/#3) — RESOLVED in v2.15 by Mission Thread (rule #14) + Frame-break Protocol. Per-round candidate_routes generation IS the mid-run direction propose; commit-gate checks 8 + 10 IS the adversary review of direction relevance.
 
 **Low priority** (defer until empirical need surfaces):
 - **Stop / Resume / Abandon** — only relevant if abelian truly runs 4h+ long-horizon campaign and gets interrupted.
@@ -130,3 +130,119 @@ Positioning preserved: `adversarial collaboration on deep + innovative +
 long-horizon iteration with tractable doc + testable metric`. Tasks with
 no testable metric remain out of scope (use ce-brainstorm).
 
+## v2.15 — telos shift to goal-driven co-research (Stephen 2026-05-03)
+
+Trigger: codex 56-round trading-internal PM dogfood (2026-05-02) where
+attack-clean rounds produced zero mission-metric movement (rounds 30-56).
+v2.14 had no mechanism to flag "attack PASS, mission flat" as gate-fail;
+v2.15 makes goal-progress structurally required and replaces
+plateau-as-termination with Frame-break Protocol (5-step creative-escape).
+
+**Changes**:
+
+- **INVARIANTS rule #14 — Mission Thread per round** (NEW): every round
+  must populate 7-field `mission_thread` block (goal_paraphrase fresh
+  vs prior round / metric_delta / blocker_status / mission_relevance /
+  candidate_routes ≥2 LLM-generated alternatives / selected_route_id /
+  selection_reason citing trade-offs). Forces per-round program.md
+  re-read and N-best route enumeration.
+- **INVARIANTS rule #15 — Evidence Class enum** (NEW): adversary header
+  block gains mandatory `evidence_class:` line, whitelist
+  `theoretical | paper | replay | settled | dry_run | live`. Prevents
+  cross-layer evidence confusion (v2.14 cron-vs-WS bug class).
+- **INVARIANTS rule #2 commit-gate**: 7 always-on checks → 10 always-on +
+  1 conditional. New checks: 8 (mission_thread completeness + freshness),
+  9 (evidence_class enum), 10 (goal-progress required). Conditional check
+  11 is the v2.11 codex-review check (renumbered from 8).
+- **INVARIANTS rule #6 termination**: removed `adversary-exhausted`
+  and metric-only `plateau` as standalone termination conditions.
+  These now trigger Frame-break Protocol instead. New termination:
+  `no-proposal-after-K-frame-breaks` (default K=2). Termination set:
+  `goal-met | no-proposal-after-K-frame-breaks | mutual-KILL | interrupted`.
+- **SKILL.md Frame-break Protocol** (NEW section): 5 mandatory steps
+  when round looks "stuck" (adversary-exhausted OR metric stalled OR
+  candidate_routes weak). Steps: reject-pool mining (mine prior unselected
+  routes with positive est_delta), attack-class library escalation
+  (load 1 cross-domain library, fresh adversary call), peer framing swap
+  (co-research only), goal re-paraphrase from current state (allow
+  bounded speculative routes), cross-peer alternative_routes mining
+  (co-research only). Frame-break encodes "plateau is when LLM
+  creative capacity should fire, not when loop should give up."
+- **SKILL.md adversary line 273 partial relaxation**: co-research mode
+  adversary may write informational `alternative_routes:` section after
+  attacks (rule #11 schema extension). Non-binding, gate ignores, but
+  readable by next round's mission_thread.candidate_routes generation
+  (Frame-break Protocol step 5). Unilateral mode keeps the original
+  attack-only ban (no peer to consume alternatives = adversary-as-proposer
+  collapse vector).
+- **state.json schema**: added `frame_break_count_consecutive` (top-level)
+  and `mission_thread`, `frame_break_fired`, `frame_break_steps_run`
+  per round.
+- **SKILL.md duplicate self-check block**: cleaned (v2.14 had the
+  termination self-check json appearing twice on lines 736-747 and
+  749-759; v2.15 keeps single canonical version with v2.15 condition
+  list).
+- **Mid-run direction propose + adversary review (TODO Medium priority)**:
+  RESOLVED by Mission Thread + Frame-break Protocol. Stephen's note in
+  v2.13 future TODOs was "Strategy in program.md is pre-fixed; long-
+  horizon innovative task may benefit from 'round N: should we revise
+  direction?' with adversary review." Mission Thread's per-round
+  candidate_routes generation IS that mid-run direction propose; commit-
+  gate 8 + 10 IS that adversary review of direction relevance.
+
+**What v2.15 does NOT change** (anti-paradigm-reset razor):
+- Adversary mechanism 100% preserved: every round still spawns isolated
+  adversary, still requires nonce header (rule #11), still validates
+  attack-class checklist, still blocks commit on attack-fail. Attack
+  mechanism is necessary but no longer sufficient.
+- Co-research mode (v2.10) and mutual inspiration step (v2.10) preserved.
+- Attack-class libraries (v2.14) preserved; Frame-break Protocol step 2
+  builds on the library mechanism.
+- All v2.0-v2.14 rules #1-#13 preserved verbatim except rule #2
+  (commit-gate count) and rule #6 (termination conditions) which gain
+  v2.15 additions documented above.
+- Backward compatibility: v2.5+ program.md without v2.15 fields gets
+  loud warning and starts; mutator must populate mission_thread per
+  round (forced by commit-gate, not by program.md schema).
+
+**Razor history (in-conversation, 2026-05-02 → 2026-05-03)**:
+v2.15 spec went through 4 razors before this commit landed:
+1. First razor — Tier-1/2/3 split with handoff command + synthesis
+   packet → Stephen razored to single skill, no new commands, no
+   new artifacts.
+2. Second razor — paradigm-reset v3.0 framing (commit-gate inversion,
+   adversary role full rewrite) → Stephen razored: attacks/challenge
+   are load-bearing; v2.10-v2.14 IS the递进 chain toward goal-driven
+   co-research; v2.15 is the next increment, not a paradigm reset.
+3. Third razor — convergence "adversary-exhausted AND last-3-rounds-
+   metric-progress → still terminate" → Stephen razored: that's
+   terminating in winning state; the right move is delete adversary-
+   exhausted entirely as standalone termination.
+4. Fourth razor — "adv-exhausted + metric stalled = stop via plateau" →
+   Stephen razored: that's exactly when LLM should innovatively inspire
+   and propose, not stop. Plateau triggers Frame-break Protocol; only
+   no-proposal-after-K-frame-breaks (creative exhaustion) terminates.
+
+Final razored version is the spec landed in this commit.
+
+## v3.0 — future (deferred, NOT scoped for v2.15)
+
+Architectural changes that would require breaking program.md schema or
+multi-peer dispatch rewrite:
+
+- **N>2 peers** — co-research is currently 2-peer hardcoded. True
+  competitive-cooperative ensemble with N peers requires dispatch /
+  voting / mutual inspiration semantics rewrite. Defer until 2-peer
+  with v2.15's 4-route candidate pool (2 peers × 2 routes) proves
+  insufficient on real campaigns.
+- **commit-gate inversion** — make goal-progress the PRIMARY check
+  with attack-survival as filter (current v2.15: both required, OR'd
+  with exploration-round exemption). True inversion would let
+  metric-improving mutations land even with adversary attacks if
+  attacks don't predict regression. v2.15 keeps both as required
+  (necessary AND condition), which is the right safety-first compromise
+  for now.
+- **Adversary role full rewrite (line 273 ban removed entirely)** —
+  v2.15 only relaxes for co-research, informational. Full removal would
+  make adversary a co-researcher in unilateral mode too. Risky without
+  empirical track record on the partial co-research relaxation first.

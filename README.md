@@ -74,25 +74,29 @@ When termination fires, post-campaign escalation review writes locked-template c
 
 For tasks that don't need adversarial collaboration (single-axis verification, ship-prep, audit), switch to `--mode=unilateral` — single mutator + single adversary, 1× cost.
 
-## The 13 INVARIANTS (long-horizon LLM scaffolding)
+## The 15 INVARIANTS (long-horizon LLM scaffolding)
 
 These rules are **scaffolding** — not adversarial-collaboration-specific, but mandatory for any LLM agent loop running >5 rounds. Re-read at start of every round (rule #3 itself).
 
 1. **Adversary output must be on disk** (not just conversation context)
-2. **Commit-gate** — 7 checks (8 with `--code-review=on`): file exists, header nonce matches, mtime in valid window, verdict in body, drift check, pre-files exists, eval value matches state, [+ codex-review.txt clean of P1/P2]
+2. **Commit-gate** — v2.15: 10 always-on + 1 conditional. Always-on 1-7 (file exists, header nonce matches, mtime in valid window, verdict in body, drift check, pre-files exists, eval value matches state) + 8 (mission_thread completeness/freshness, rule #14) + 9 (evidence_class enum, rule #15) + 10 (goal-progress required, rule #14). Conditional 11 (when `--code-review=on`): codex-review.txt clean of P1/P2.
 3. **Per-round refresh** — `cat INVARIANTS.md && cat state.json` from disk
 4. **Drift check** — `expected_head` + branch + dirty-tree before any commit/revert
 5. **Pre-files snapshot** — `git ls-files` inventory before mutate (round-level revert tax)
-6. **Forbidden termination rationales** — 5 stopping-preferences refused as reasons; loop runs till mechanism converge (no rounds/budget cap)
+6. **Forbidden termination rationales** — 5 stopping-preferences refused as reasons; loop runs till mechanism converge (no rounds/budget cap). v2.15 termination conditions: `goal-met | no-proposal-after-K-frame-breaks | mutual-KILL | interrupted`. `adversary-exhausted` and metric-only `plateau` REMOVED as standalone termination — they trigger Frame-break Protocol (5-step creative-escape) instead.
 7. **Verbatim Goal/Target/Constraints** in adversary prompts (no paraphrasing)
 8. **Self-judge discipline** — schema-grounding required: concrete (file/column/API/signature) for code; fuzzy-ground via `Eval ground:` declaration + quote-grep gate for doc/research/audit/decision tasks (v2.14). `--adversary=off` + self-judge hard-refused
 9. **Execution gate** — adversary-exhaustion alone is necessary but not sufficient
 10. **Production-runtime safety** — cron/supervisor/watchdog file edits need extra discipline
-11. **Adversary header block** — mandatory `ABELIAN-ADV-v1` format with nonce + timestamp (anti-fabrication friction defense for prompt-inject dispatch)
+11. **Adversary header block** — mandatory `ABELIAN-ADV-v1` format with nonce + timestamp + `evidence_class:` enum (v2.15) (anti-fabrication friction defense for prompt-inject dispatch). Co-research mode adversary may write optional informational `alternative_routes:` section after attacks (v2.15).
 12. **Code Review supplemental gate** *(opt-in, `--code-review=on`)* — `codex review --uncommitted` as additional code-quality gate; output to `codex-review.txt`; commit refused if `[P1]` or `[P2]` markers present
 13. **Self-attack is not adversary** *(v2.12)* — conversation-level "I attacked my own propose" with no spawn / no isolated context / no nonce header is unilateral self-judge (rule #8 degraded mode), not co-research. Empirically validated 17× catch-rate gap (2026-04-29 self-audit dogfood)
+14. **Mission Thread per round** *(v2.15)* — every round must populate 7-field `mission_thread` block (goal_paraphrase fresh vs prior round / metric_delta / blocker_status / mission_relevance / candidate_routes ≥2 LLM-generated alternatives / selected_route_id / selection_reason citing trade-offs). Forces per-round program.md re-read and N-best route enumeration. Closes the v2.10-v2.14 gap where program.md was read once at round 0 but goal-anchor did not propagate per round (codex 56-round PM dogfood 2026-05-02).
+15. **Evidence Class enum in adversary header** *(v2.15)* — adversary header gains mandatory `evidence_class:` line, whitelist `theoretical | paper | replay | settled | dry_run | live`. Prevents cross-layer evidence confusion (v2.14 cron-vs-WS bug class — paper-fill evidence and live-fill evidence both score `n/a` on the same attack class for materially different reasons).
 
 Full text in [INVARIANTS.md](INVARIANTS.md).
+
+**v2.15 Frame-break Protocol** (NEW, see [SKILL.md "Frame-break Protocol"](SKILL.md)): when a round looks "stuck" (adversary-exhausted OR metric stalled OR all candidate_routes have est_metric_delta ≤ 0), the loop runs 5 mandatory creative-escape steps BEFORE any termination claim — reject-pool mining (mine prior unselected routes with positive est_delta), attack-class library escalation (load 1 cross-domain library, fresh adversary call), peer framing swap (co-research only), goal re-paraphrase from current state, cross-peer alternative_routes mining (co-research only). Only `no-proposal-after-K-frame-breaks` (default K=2) — i.e., LLM has demonstrably tried 5 frame-breaks across K rounds and still cannot generate a positive-EV next step — terminates the loop on exhaustion. Plateau is when LLM creative capacity should fire, not when the loop should give up.
 
 ## Install
 

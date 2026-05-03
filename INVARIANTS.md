@@ -16,7 +16,7 @@ Each round's adversary call writes `$RUN_DIR/round-N/adversary.txt`
 actually run. Conversation-only adversary output is invalid and fails
 commit-gate (rule #2).
 
-## 2. Commit-gate (7 checks, all must pass before `git commit`)
+## 2. Commit-gate (10 always-on checks + 1 conditional, all must pass before `git commit`)
 
 1. `$RUN_DIR/round-N/adversary.txt` exists and is non-empty.
 2. The file starts with the standard adversary header block (rule #11)
@@ -30,6 +30,32 @@ commit-gate (rule #2).
 6. `$RUN_DIR/round-N/pre-files.txt` exists (rule #5).
 7. Eval ran in this round's process and produced the metric value
    recorded in `state.rounds[N].metric_value`.
+8. **Mission Thread completeness (v2.15, rule #14)** —
+   `state.rounds[N].mission_thread` is present with all 7 fields populated;
+   `candidate_routes` length ≥ 2; `goal_paraphrase` differs from
+   `state.rounds[N-1].mission_thread.goal_paraphrase` (string equality
+   check; identical paraphrase = mutator skipped re-reading program.md =
+   gate-fail); `selection_reason` mentions at least one unpicked route
+   from `candidate_routes` by id. See rule #14 for schema.
+9. **Evidence Class enum (v2.15, rule #15)** — `adversary.txt` header
+   block contains `evidence_class:` line and value is in the v15 whitelist
+   (`theoretical | paper | replay | settled | dry_run | live`).
+   `peer-A.txt` and `peer-B.txt` both validated in co-research mode.
+10. **Goal-progress required (v2.15, rule #14)** — at least ONE of:
+    (a) `mission_thread.metric_delta > 0`,
+    (b) `mission_thread.blocker_status` ∈ `{removed, partially}`,
+    (c) `mission_thread.exploration_round = true` AND
+    `state.frame_break_count_consecutive ≤ 2` (i.e., the round is
+    explicitly an exploration / frame-break round and we have not
+    chained more than 2 consecutive exploration rounds).
+    Pure attack-survival with `metric_delta = 0 AND blocker_status = n/a
+    AND exploration_round = false` is gate-fail. This is the structural
+    enforcement of "attack must serve goal, not exist for its own sake."
+
+11. **Code Review supplemental (conditional, rule #12, opt-in via `--code-review=on`)** —
+    `$RUN_DIR/round-N/codex-review.txt` exists, non-empty, AND contains
+    no `[P1]` or `[P2]` severity markers. Skipped silently (with loud
+    notice) if codex CLI unavailable, per rule #12 graceful degradation.
 
 Any failure → revert this round (`git checkout` + scoped clean of
 new files via pre-files diff), mark round `gate-failed` in state, do
@@ -107,18 +133,64 @@ load-bearing reason for stopping reduces to ANY of:
 - "Cleaner to ship what we have than fold in more"
 
 These are stopping preferences, not goal-fulfillment. Termination is
-justified only by mechanism (N=3 is the hardcoded internal default for
-plateau / exhaustion thresholds — not a user flag):
+justified only by mechanism. **v2.15: telos shift — termination requires
+goal-progress evidence OR creative exhaustion (frame-break protocol
+fired without yielding a positive-EV route), NOT adversary-exhaustion
+alone. The loop's goal is goal-fulfillment, not attack-survival.**
+
+Valid termination conditions (v2.15):
 
 - **Goal met** — eval ≥ target (unilateral) OR champion ≥ target (co-research)
-- **Adversary exhausted across attack classes for N=3 consecutive rounds** + execution gate (rule #9). Each attack class addressed with no concrete attack across N rounds.
-- **Plateau** — N=3 consecutive rounds with no eval improvement. Co-research mode adds: AND candidate edit-distance falling between peer mutations (diversity collapse).
-- **Mutual KILL deadlock** — N=3 rounds where every peer attack succeeds on both sides (co-research only).
+- **No-proposal-after-frame-breaks** — `state.frame_break_count_consecutive
+  ≥ K` (default K=2) AND the most recent frame-break protocol run
+  (see SKILL.md "Frame-break Protocol" section) yielded no
+  `candidate_routes` entry with `est_metric_delta > 0` despite running
+  ALL 5 mandatory frame-break steps (reject-pool mining, attack-class
+  library escalation, peer framing swap if co-research, goal
+  re-paraphrase from current state, cross-peer alternative_routes
+  mining if co-research). This is the v2.15 "creative exhaustion"
+  termination — the LLM has tried both its primary frame and 5 frame-break
+  expansions and still cannot generate a positive-EV next step.
+- **Mutual KILL deadlock** — N=3 rounds where every peer attack succeeds
+  on both sides (co-research only).
+
+**v2.15 removed conditions (compared to v2.14)**:
+
+- ~~**Adversary exhausted**~~ — REMOVED as standalone termination. No
+  attacks ≠ goal met. If adversary is exhausted but metric is still
+  progressing, the loop is in a winning state and must continue. If
+  adversary is exhausted AND metric stalled, that triggers Frame-break
+  Protocol (NOT termination); only after K consecutive frame-break
+  rounds yield no positive-EV route does the loop terminate via
+  no-proposal-after-frame-breaks. Adversary-exhausted is now an
+  informational signal that contributes to frame-break trigger, not a
+  standalone termination.
+- ~~**Plateau** (metric stopped improving alone)~~ — REMOVED as standalone
+  termination. Plateau triggers Frame-break Protocol (the LLM is
+  expected to creatively escape, not give up). Termination via plateau
+  only fires through the no-proposal-after-frame-breaks path above.
 
 If a mechanism signal would not fire by round 3, the loop has not
 actually converged. Either tighten program.md (target/eval) or wait
 for the user to abort. "Running long" is a forbidden rationale —
 either fire a real mechanism signal or let the user SIGINT.
+
+**Rationale (v2.15 telos shift)**: v1.x – v2.14 inherited the
+adversarial-loop telos in which "no more attacks land" was equivalent
+to "done." Codex 56-round PM dogfood (2026-05-02) demonstrated the
+failure mode at scale: 56 rounds with attack-survival as the gate, but
+mission metric did not move meaningfully because no rule forced
+attacks to serve goal. v2.15 telos: the loop is goal-driven
+co-research, not adversary-defense. Adversary mechanisms (rules #1, #7,
+#11, #13) are 100% preserved — every round still spawns isolated
+adversary, still requires nonce header, still falsifies via attack
+classes. What changed: attack-survival is now necessary but not
+sufficient. Mission Thread (#14) anchors per-round work to goal;
+Evidence Class (#15) prevents cross-layer evidence confusion; Frame-break
+Protocol expands the loop's response to plateau from "stop" to
+"creatively break frame." This is the structural cash-out of v2.13's
+"Adversarial Collaboration Framework" rename — collaboration in the
+mechanism, not just the marketing copy.
 
 ## 7. Verbatim Goal/Target/Constraints in adversary prompts
 
@@ -246,9 +318,38 @@ peer: unilateral | peer-A | peer-B
 nonce: <state.rounds[N].adversary_nonce>
 started_at: <ISO 8601 with milliseconds>
 verdict: <single-line verdict, identical to state.rounds[N].verdict_line>
+evidence_class: theoretical | paper | replay | settled | dry_run | live
 ---
 <attack content begins here>
+
+[optional, co-research only — v2.15] alternative_routes:
+  - id: <slug>
+    mechanism: <one-line description>
+    est_metric_delta: <float | "unknown">
+    rationale: <why peer would consider this>
 ```
+
+`evidence_class` is REQUIRED (v2.15, rule #15). Whitelist:
+- `theoretical` — pure analysis of code/spec without execution
+- `paper` — paper trade / dry computation, no real-world commit
+- `replay` — historical data replay through pipeline
+- `settled` — observed against settled real-world outcome
+- `dry_run` — system-level dry-run with full pipeline but no commit
+- `live` — observed against live production system
+
+Choose the strongest (rightmost on the ladder) class actually exercised.
+`live` claims must be reproducible from `state.rounds[N]` artifacts.
+Cross-class confusion ("we ran a paper test, the live behavior must be
+the same") is the v2.14 cron-vs-WS bug class — rule #15 makes the layer
+explicit per-round.
+
+`alternative_routes` is OPTIONAL and ONLY in co-research mode (v2.15).
+Adversary in unilateral mode remains attack-only (line 273 in SKILL.md
+preserved for unilateral). Co-research adversary may write informational
+alternative routes the next round's mutator MAY mine when generating
+`mission_thread.candidate_routes` (rule #14). Commit-gate (rule #2 check
+8) does NOT validate `alternative_routes` content; this section is
+non-binding informational signal, not a commitment.
 
 **Mutator protocol**:
 
@@ -313,11 +414,11 @@ abelian's state at this loop step (mutation written to working tree, not
 yet committed). If `node` is not in PATH, prefix with `bun
 /path/to/codex` (per `~/.bashrc` shim convention).
 
-**Commit-gate addition** (rule #2 grows from 7 → 8 checks when
-`--code-review=on`):
+**Commit-gate addition** (rule #2 conditional check 11 in v2.15
+numbering, formerly check 8 in v2.14, when `--code-review=on`):
 
-8. `$RUN_DIR/round-N/codex-review.txt` exists, non-empty, AND contains
-   no `[P1]` or `[P2]` severity markers.
+11. `$RUN_DIR/round-N/codex-review.txt` exists, non-empty, AND contains
+    no `[P1]` or `[P2]` severity markers.
 
 **Loop semantics**: night-shift's "fix → re-review → max 10 rounds →
 revert" pattern is allowed but optional. Simplest form: a single
@@ -329,8 +430,8 @@ the gate-check itself is binary.
 - `--code-review=on` + codex CLI unavailable (binary missing OR
   `~/.codex/auth.json` absent) → skip rule #12 only (don't fail loop),
   write notice in 3 places (console + escalations.md + History row)
-- Fall back to rule #2's 7-check gate with rule #12 marked "skipped:
-  codex unavailable"
+- Fall back to rule #2's 10-always-on-check gate (v2.15) with rule #12
+  marked "skipped: codex unavailable"
 
 **Honest scope**: rule #12 has **no nonce header protection** (rule #11
 does not apply — codex review's CLI doesn't accept custom prompt
@@ -415,3 +516,133 @@ question as "human peer-B substitute". Stephen's question is review,
 not active peer-attack. Real peer-B is a spawned agent with isolated
 context. Self-justification by selectively invoking own memory is the
 exact same-prior collapse rule #13 prevents.
+
+## 14. Mission Thread per round (v2.15) — anchor every round to goal
+
+Every round MUST populate `state.rounds[N].mission_thread` with all
+seven fields below BEFORE the round's commit-gate runs. Missing or
+incomplete mission_thread = commit-gate check 8 fails = revert.
+
+```json
+"mission_thread": {
+  "goal_paraphrase": "fresh paraphrase of program.md Goal, this round",
+  "metric_delta": 0.42,
+  "blocker_status": "removed | partially | blocked_on:<dep> | n/a",
+  "mission_relevance": "one sentence: how this round serves the mission",
+  "candidate_routes": [
+    {
+      "id": "route-a",
+      "mechanism": "what this route DOES, one line",
+      "est_metric_delta": 0.5,
+      "est_cost": "cheap | medium | expensive",
+      "blocker_chain": "if removing a blocker, which one"
+    },
+    { "id": "route-b", ... }
+  ],
+  "selected_route_id": "route-a",
+  "selection_reason": "must mention at least one unpicked route's tradeoff",
+  "exploration_round": false
+}
+```
+
+**Field rules**:
+
+- `goal_paraphrase` — paraphrase of program.md Goal, fresh this round.
+  String-equality check against `state.rounds[N-1].mission_thread.goal_paraphrase`
+  MUST fail (i.e., this round's paraphrase MUST differ from prior round's).
+  Identical paraphrase = mutator did not re-read program.md = commit-gate
+  fails. Forces per-round Goal re-read; closes the v2.14 root cause where
+  program.md was read once at round 0 then INVARIANTS re-read per round
+  but goal-anchor did not propagate.
+
+- `metric_delta` — change in target metric this round (positive =
+  improvement under min/max declared in program.md Metric). May be
+  `null` if no eval ran (must pair with `exploration_round: true` and
+  `blocker_status` in `{removed, partially}` or `mission_relevance` that
+  explains the round's role as setup-for-next-round).
+
+- `blocker_status` — `removed` if a blocker was retired this round;
+  `partially` if blocker chain advanced but not finished; `blocked_on:<dep>`
+  if blocked on a specific dependency (named); `n/a` if round did not
+  target a blocker.
+
+- `mission_relevance` — single sentence connecting the round's work
+  back to the program.md Goal. Forbidden phrases: "exploring", "learning
+  more", "investigating", "trying" — these are exploration-disguising
+  phrases. If the round is genuinely exploration, set `exploration_round:
+  true` and explain in selection_reason what bounded question is being
+  answered.
+
+- `candidate_routes` — ARRAY OF ≥2 entries. The mutator MUST generate
+  at least 2 distinct routes per round and document them, even if one
+  is obviously chosen. Single-route rounds are commit-gate fail. Routes
+  unselected this round are mineable by future rounds via reject-pool
+  mining (Frame-break Protocol step 1). `est_metric_delta` may be
+  `"unknown"` ONLY for exploration rounds.
+
+- `selected_route_id` — id of chosen route (must match an entry in
+  candidate_routes).
+
+- `selection_reason` — must reference at least one unpicked route's
+  trade-off by id (e.g., "route-b est cheaper but smaller delta;
+  route-c blocked on integration we don't have"). "Picked highest est
+  delta" alone is insufficient — must explain why the alternatives
+  were rejected.
+
+- `exploration_round` — boolean. `true` allows null metric_delta and
+  `unknown` est_metric_delta in candidate_routes, but commit-gate check
+  10 limits consecutive exploration rounds to 2.
+
+**Why this rule exists**: see "v2.15 Rationale" subsection in rule #6.
+Briefly: codex 56-round PM dogfood (2026-05-02) showed that without a
+per-round goal-anchor, attacks become self-justifying ("this passed all
+attack classes" → commit) regardless of mission progress. Mission Thread
+makes goal-relevance a structural per-round artifact, not a vibe.
+
+**Empirical anchor (2026-05-02 PM trading-internal codex 56-round dogfood)**:
+adversary closed clean across 7 attack classes for rounds 30-56 yet
+mission metric (live-flip readiness) was identical at round 56 vs round
+30. v2.14 had no mechanism to flag this — every commit was gate-clean.
+v2.15 rule #14 + commit-gate check 10 reverts those rounds.
+
+## 15. Evidence Class enum in adversary header (v2.15)
+
+Every `adversary.txt` (and `peer-A.txt` / `peer-B.txt`) header block
+MUST include an `evidence_class:` line with value in the v15 whitelist
+(see rule #11 schema for full enum).
+
+**Why**: prior versions did not require evidence-class disambiguation,
+so a round could pass attack-class checks based on theoretical analysis
+of code while claiming the result holds for live production. This is
+the v2.14 cron-vs-WS confusion class: paper-fill evidence and live-fill
+evidence both score `n/a` on attack class "race / TOCTOU" but for
+materially different reasons. v2.15 forces per-round evidence-layer
+declaration so the adversary's `n/a` claims are scoped to the layer
+actually exercised.
+
+**Validation**: commit-gate check 9 verifies the field is present and
+in whitelist. Cross-class evidence claims (e.g., adversary marks
+`evidence_class: theoretical` then asserts `n/a-this-target` on a class
+that requires runtime observation like `race / TOCTOU`) are surfaced by
+the round's own attack list — no separate gate, but reviewers can
+grep for `evidence_class: theoretical` + `n/a-this-target` on
+runtime-only classes and flag for re-run with `dry_run` or `live`.
+
+**Picking the right class**:
+
+- `theoretical` — code/spec read; no execution. Most cheap, weakest
+  evidence. Acceptable for early-round scaffolding.
+- `paper` — computation runs but no real-world commit (e.g., paper-trade
+  the strategy on synthetic prices, no exchange order placed).
+- `replay` — historical real-world data replayed through pipeline.
+  Catches data-shape bugs `paper` misses; misses real-time latency.
+- `settled` — observed against a settled real-world outcome (e.g.,
+  market resolved, ground truth available).
+- `dry_run` — system-level dry-run with full pipeline (real connections,
+  real timing) but no commit (e.g., trade signal sent to fake broker).
+- `live` — observed against live production system. Strongest evidence;
+  also riskiest. Reserve for final ship rounds.
+
+Choose the strongest class ACTUALLY exercised this round. Inflating
+the class (claiming `live` when only `paper` ran) is silent
+fabrication; rule #11's nonce-friction defense applies.
