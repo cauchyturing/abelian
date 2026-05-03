@@ -50,64 +50,9 @@ description: >
   **Target should include executable artifacts whenever possible —
   spec-only is the degraded mode for both modes.**
 
-  **v2.14 — non-code task readiness**: attack-class libraries by domain
-  shipped (research-class / audit-class / decision-class / doc-class);
-  doc-task cross-attack template with falsification-form requirement;
-  fuzzy-ground protocol (INVARIANTS rule #8 extension) for tasks where
-  ground is prose / decision / research output rather than code / schema.
-  Non-code campaigns declare `task:` field and ≥1 library; tasks with no
-  testable metric remain out of scope (positioning preserved: tractable
-  doc + testable metric).
-
-  **v2.15 — telos shift to goal-driven co-research**: every round must
-  populate `mission_thread` (rule #14, 7 fields including ≥2
-  candidate_routes the LLM generated this round + selection_reason
-  citing trade-offs); adversary header gains `evidence_class:` enum
-  (rule #15, 6-class ladder from `theoretical` to `live`) so attack
-  scope is per-round explicit; commit-gate gains 3 always-on checks
-  (mission_thread completeness, evidence_class enum, goal-progress
-  required) so attack-survival is necessary but not sufficient for
-  commit; convergence schema rewritten — `adversary-exhausted` and
-  metric-only `plateau` REMOVED as standalone termination conditions,
-  replaced by Frame-break Protocol (5-step mandatory sequence: reject-pool
-  mining, attack-class library escalation, peer framing swap, goal
-  re-paraphrase from current state, cross-peer alternative_routes
-  mining) which fires when adversary-exhausted OR metric stalled OR
-  candidate_routes weak; only `no-proposal-after-K-frame-breaks` after
-  all 5 steps yield no positive-EV route can terminate the loop on
-  exhaustion. Adversary mechanism (rules #1, #7, #11, #13) 100%
-  preserved — every round still spawns isolated adversary with nonce
-  header and attack-class checklist; co-research adversary may
-  additionally write informational `alternative_routes:` (line 273
-  partial relaxation, co-research only). Cashes v2.13's "Adversarial
-  Collaboration Framework" rename out structurally: collaboration is
-  now in commit-gate / convergence / per-round mission anchor, not
-  just marketing copy. Anchor: codex 56-round trading-internal PM
-  dogfood (2026-05-02) where attacks closed clean rounds 30-56 with
-  zero mission metric movement — v2.14 had no mechanism to revert
-  those rounds; v2.15 does.
-
-  **v2.16 — round-0 program contract gate**: closes the upstream
-  cause that v2.15's per-round mechanisms cannot fix from below
-  (fuzzy program.md → every paraphrase is more fuzz). Rule #16
-  Program Contract Gate runs before round 1: hard checklist (Goal
-  has measurable noun / Target paths exist or have create: marker /
-  Eval shell-runnable or rubric / Metric has baseline+direction+tolerance
-  / Strategy ≥2 axes / Attack Classes ≥1 library / Takeaway section
-  present), Takeaway as DERIVED contract (3 fields with quote-grep +
-  semantic linkage trace to Goal/Eval/Metric/Constraints — not
-  parallel truth source), round-0 baseline eval (closes v2.15
-  metric_delta poisoning by declarative baselines), file-gated
-  round-0 program-adversary (rule #11 protocol; attack classes c1/c2
-  /c3/c4/d4 program-contract-integrity set), program-contract sha256
-  hash (rule #3 per-round refresh recomputes; mismatch →
-  contract-drift-stopped + reconfirmation_required), TTY-aware
-  confirmation (interactive: stdin go/no, no timeout; non-TTY:
-  --auto-launch-after-gate required). Single rule, single new
-  status, single new flag, narrow `--migrate-takeaway` opt-in (drafts
-  only, never autostart). v2.16 designed via 2-round co-research
-  with codex (peer-B); 12 verified-substantive findings integrated
-  (TODO.md "v2.16 Razor history" + co-research log).
+  Per-version mechanism details + razor history live in [TODO.md](TODO.md)
+  and [README.md](README.md) changelog. SKILL.md description stays
+  timeless; changelog rotates.
 
   Use when user says "abelian", "autoloop", "auto-optimize", "run experiments",
   "optimize this", or "Karpathy loop". The skill name is historical (covers

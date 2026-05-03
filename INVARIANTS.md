@@ -989,37 +989,15 @@ Aborting to round-0 is the correct response to contract invalidity:
 the LLM cannot creatively escape a broken contract; only the human
 can re-confirm.
 
-### Why this rule is rule #16 and not three rules
-
-Round-1 codex review (Route-1, est_metric_delta +1.6) preferred a
-single dense rule over splitting into checklist (#16) + Takeaway (#17)
-+ confirmation (#18). Reason: all three are aspects of one semantic
-unit ("the program.md contract is sharp + measured + agreed before
-round 1 starts"). Splitting would induce rule-number sprawl without
-adding clarity; the dense rule matches Occam and stays consistent
-with how rules #11 (header block) and #12 (code-review supplemental)
-embed multiple sub-mechanisms within one rule.
-
 ### Empirical anchor
 
-Codex 56-round trading-internal PM dogfood (2026-05-02) had two
-upstream causes that v2.15 partially addressed and rule #16 closes:
+Codex 56-round trading-internal PM dogfood (2026-05-02): rounds 30-56
+closed adversary-clean across 7 attack classes, mission metric
+identical at round 56 vs round 30. v2.15 rule #14 + #15 fix per-round
+goal-anchor and evidence-class drift but assume program.md itself is
+sharp at round-0. If Goal is "improve trading internal" with no
+Takeaway and fabricated baseline, every round paraphrases the fuzz
+forward. Rule #16 closes this upstream cause: contract checked,
+measured, hashed, human-signed before any round runs.
 
-1. Per-round goal-anchor didn't propagate (closed by rule #14 Mission
-   Thread, v2.15).
-2. Cross-layer evidence got muddled (closed by rule #15 Evidence
-   Class, v2.15).
-
-But both v2.15 fixes assume program.md itself is sharp at round-0.
-If program.md Goal is "improve trading internal" with no Takeaway
-contract and a fabricated baseline, every round of v2.15 paraphrases
-the fuzz forward. v2.16's rule #16 closes this last upstream cause:
-the contract itself is checked, measured, hashed, and human-signed
-before any round runs.
-
-The 4-razor history of v2.16 design (TODO.md "v2.16 Razor history")
-documents the full reasoning trail: round-1 codex review found 6
-issues (2 BLOCKER + 4 MAJOR + 1 MINOR/MAJOR), peer-A response found
-6 counter-pushes, round-2 codex review added 3 more MAJORs and
-converged. Final spec is the integration of all 12 verified-substantive
-findings.
+Design history + co-research razors: see [TODO.md](TODO.md) "v2.16".

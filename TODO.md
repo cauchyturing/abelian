@@ -247,124 +247,48 @@ multi-peer dispatch rewrite:
   make adversary a co-researcher in unilateral mode too. Risky without
   empirical track record on the partial co-research relaxation first.
 
-## v2.16 — Round-0 Program Contract Gate (Stephen 2026-05-03)
+## v2.16 — Round-0 Program Contract Gate (2026-05-03)
 
-Trigger: hours after v2.15 shipped, Stephen flagged a 4th layer ABOVE
-v2.15's per-round mechanisms — program.md ITSELF can be fuzzy / shallow
-/ unconfirmed at round-0, so Mission Thread paraphrases fuzzy goal into
-more fuzz round after round. Grep'd SKILL.md: 4/4 missing (program.md
-authoring guidance, depth gate, takeaway summarization, user
-confirmation before launch). v2.16 closes this upstream cause.
+**Trigger**: hours after v2.15 shipped, grep'd SKILL.md for 4 program.md authoring properties → 4/4 missing. v2.15's per-round mechanisms paraphrase fuzz forward if program.md itself is fuzzy at round-0.
 
-**Co-research with codex (peer-B), 2 rounds to convergence**:
+**Designed via 2-round co-research with codex (peer-B, gpt-5.5 xhigh)**, 12 verified findings integrated.
 
-- **Round 1**: peer-A (me, opus 4.7) sent v2.16 spec draft + 6 self-attacks
-  + 6 push axes. peer-B (codex gpt-5.5 xhigh) returned 6 attacks (2
-  BLOCKER + 4 MAJOR + 1 MINOR/MAJOR) + 4 alternative routes. Strong
-  findings: (BLOCKER-1) Takeaway as parallel truth source — adversary
-  prompts only quote Goal/Target/Constraints not Takeaway, so Takeaway
-  could drift without per-round mechanism catching; (BLOCKER-2) no
-  immutable round-0 contract — confirmation without hash = decoration;
-  (MAJOR-3) declared baseline syntactic not measured — false baseline
-  poisons every metric_delta in v2.15's gate; (MAJOR-4) program-adversary
-  not file-gated — violates rule #1; (MAJOR-5) Target paths-exist
-  rejects valid create-artifact campaigns; (MAJOR-6) Estimated horizon
-  re-introduces v2.9-removed cap-thinking.
-- **Round 2**: peer-A absorbed all 6 (each for structural reason, not
-  deference) + sent 6 counter-pushes (C1-C6). peer-B returned 3 more
-  MAJOR attacks + verdicts on push axes + convergence signal. Round-2
-  findings: exact baseline match brittle (need Metric.baseline_tolerance);
-  Takeaway quote-grep alone is theatre (need + semantic linkage —
-  Success cite Goal + Metric name+direction; Validated_by cite
-  Eval/Metric + grep-able/runnable; Constraints cite ≥1 actual
-  prohibition); hash mismatch as drift-stopped too coarse (need
-  contract-drift-stopped + reconfirmation_required + --reconfirm-gate).
-  Push axes verdicts: collapse `--no-confirm` and non-TTY autostart
-  to single `--auto-launch-after-gate` flag (same security event);
-  round-0 adversary always dissect (cheap universal sanity); document
-  hash overhead explicitly. Codex signaled converge after this round.
+### Spec landed
 
-**Final v2.16 spec landed**:
+- **rule #16 (NEW) — Program Contract Gate** (subsections A-I in INVARIANTS.md): hard checklist (Goal measurable noun + Target paths exist OR `create:` marker + Eval shell-runnable OR rubric + Metric baseline+direction+tolerance + Strategy ≥2 axes + Attack Classes ≥1 library + Takeaway present) | Takeaway as derived contract (3 fields, quote-grep + semantic linkage to Goal/Eval/Metric/Constraints) | round-0 baseline eval (validates declared baseline ± tolerance) | dissect program-adversary always (locked classes {c1, c2, c3, c4, d4}; rule #11 header inherited) | sha256 program contract hash (per-round refresh recomputes; mismatch → `contract-drift-stopped`) | TTY-aware confirmation (interactive stdin go/no no timeout; non-TTY refuses unless `--auto-launch-after-gate`) | `--migrate-takeaway` drafts Takeaway only + exits.
+- **rule #14 extension** — commit-gate check 8 extends: `mission_relevance` quote-greps ≥1 phrase from `Takeaway.Validated_by`.
+- **rule #4 extension** — `contract-drift-stopped` distinct from ordinary `drift-stopped` (resumable via `--reconfirm-gate`).
+- **state.json** — `round_0` block (11 fields).
+- **SKILL.md** — "Round-0 Authoring Gate" replaces "Pre-Flight"; `.gitignore` check retained inside.
+- **Frame-break Step 4** — abort to round-0 on metric_delta sign-inversion / Takeaway.Validated_by no-longer-runnable / contract-hash mismatch.
+- **Termination Discipline** — `--reconfirm-gate` re-entry path for `contract-drift-stopped`.
 
-- **INVARIANTS rule #16 — Program Contract Gate** (NEW, single dense
-  rule per codex Route-1 with est_metric_delta +1.6 spec-quality):
-  - **A** Hard checklist: Goal has measurable noun (whitelist + blacklist),
-    Target paths parent-dir-exists + path-exists OR `create:` marker,
-    Eval shell-runnable OR rubric+ground, Metric has baseline+direction+tolerance,
-    Strategy ≥2 axes, Attack Classes ≥1 library, Takeaway present.
-  - **B** Takeaway = derived contract (3 fields, no Estimated horizon):
-    Success/Validated_by/Constraints with quote-grep + semantic linkage
-    to Goal/Eval/Metric/Constraints. Gate fails on contradiction.
-  - **C** Round-0 baseline eval: shell run once at unmutated state →
-    `round-0/eval.txt`; validates against Metric.baseline ± Metric.tolerance.
-    Mismatch → refuse OR `--accept-measured-baseline` overwrite + reconfirm.
-  - **D** Round-0 program-adversary: dissect always (cheap universal
-    sanity, ~$0.10), regardless of `--adversary` flag; locked attack
-    classes `{c1-scope-drift, c2-hidden-assumption, c3-definition-elasticity,
-    c4-authority-by-citation, d4-scope-creep}`; rule #11 header inherited;
-    BLOCKER → refuse start. Respawn-twice-then-refuse on invalid.
-  - **E** Program contract hash: sha256 over normalized Goal / Task class
-    / Target / Eval / Eval ground / Metric / Constraints / Strategy /
-    Cells / Attack Classes / Takeaway. History excluded. Per-round
-    refresh (rule #3 extension) recomputes; mismatch → `contract-drift-stopped`
-    + `reconfirmation_required: true`. Resolution: new RUN_ID OR
-    `--reconfirm-gate` re-runs round-0 with new hash.
-  - **F** Confirmation gate (TTY-aware): interactive stdin go/no, no
-    timeout. Non-TTY: refuse unless `--auto-launch-after-gate` flag.
-    Single flag covers both batch-confirm-bypass and non-TTY autostart.
-    Bypass writes `state.round_0.{auto_launched, bypass_reason}` audit.
-  - **G** Migration: `--migrate-takeaway` drafts Takeaway only + exits.
-    Never autostart. Other v2.16 gaps require manual fix.
-- **INVARIANTS rule #14 extension**: commit-gate check 8 extends — when
-  Takeaway present, `mission_relevance` MUST quote-grep ≥1 phrase from
-  `Takeaway.Validated_by`. Closes the gap where mission_relevance could
-  be vibe-trace.
-- **INVARIANTS rule #4 extension**: distinguish `contract-drift-stopped`
-  (rule #16, intentional human re-edit, resumable) from ordinary
-  `drift-stopped` (uncommitted file, terminal).
-- **SKILL.md "Round-0 Authoring Gate" section** (NEW, replaces
-  Pre-Flight; .gitignore check retained inside).
-- **state.json**: `round_0` block (checklist / baseline_eval /
-  program_adversary / takeaway / program_contract_hash /
-  user_confirmed_at / auto_launched / bypass_reason /
-  reconfirmation_required).
-- **Frame-break Step 4 abort condition**: stays in-frame when Takeaway
-  + contract still valid; aborts to round-0 with reconfirmation_required
-  on metric_delta sign-inversion / Takeaway.Validated_by no-longer-runnable
-  / contract-hash mismatch.
-- **Termination Discipline**: `--reconfirm-gate` re-entry path documented
-  for resuming a `contract-drift-stopped` run.
+### Surface area
 
-**v2.16 Razor history (in-conversation 2026-05-03, plus codex co-research)**:
+| | Count |
+|---|---|
+| New INVARIANTS rule | 1 (rule #16) |
+| Existing rules extended | 2 (#4 status, #14 trace) |
+| New flags | 4 (`--auto-launch-after-gate / --migrate-takeaway / --reconfirm-gate / --accept-measured-baseline`) |
+| New run status | 1 (`contract-drift-stopped`) |
+| New program.md required section | 1 (`## Takeaway`) |
+| New commands / new files | 0 |
+| Diff (v2.16 over v2.15) | ~530 lines |
 
-1. Stephen razored the 4 missing pieces in SKILL.md → forced v2.16 from
-   "vague suggestion" to "concrete proposal".
-2. peer-A self-attacks A1-A6 → caught 5 issues before peer-B saw them
-   (whitelist exception, depth-check ROI, Takeaway theatre risk, autonomy
-   trade-off, feature creep, A6 unresolved).
-3. peer-B codex round-1 attacks → caught 6 more I missed (Takeaway-as-truth,
-   no hash, syntactic baseline, file-gating violation, create-marker, cap-thinking).
-4. peer-A counter-pushes C1-C6 → tightened hash scope to Strategy/Cells/Attack
-   Classes, narrowed migration to Takeaway-only, specced TTY-aware,
-   added c3+c4 attack classes, made trace mechanism quote-grep concrete.
-5. peer-B codex round-2 → 3 more MAJORs (baseline tolerance, semantic
-   linkage, contract-drift-stopped distinct status) + collapsed flags
-   to one + signaled converge.
+### Razor history
 
-Final spec is the integration of all 12 verified-substantive findings
-across 2 rounds, single PR, single dense rule #16. ~530 line increment
-on top of v2.15. No new commands. New flags: `--auto-launch-after-gate`,
-`--migrate-takeaway`, `--reconfirm-gate`, `--accept-measured-baseline`.
-New status: `contract-drift-stopped`. New required program.md section:
-`## Takeaway`.
+| # | Source | Caught |
+|---|---|---|
+| 1 | Stephen | flagged 4 missing pieces (authoring guidance / depth gate / takeaway / confirmation) |
+| 2 | peer-A self-attack (A1-A6) | whitelist exception, depth-check ROI, theatre risk, autonomy, feature-creep, frame-break boundary |
+| 3 | peer-B codex round-1 (2 BLOCKER + 4 MAJOR + 1 MINOR/MAJOR) | Takeaway-as-parallel-truth, no hash, syntactic baseline, file-gating violation, create-marker, cap-thinking |
+| 4 | peer-A counter-push (C1-C6) | hash scope to Strategy/Cells/Attack Classes, migration narrowed to Takeaway-only, TTY-aware spec, c3+c4 attack classes, trace via quote-grep |
+| 5 | peer-B codex round-2 (3 MAJOR + verdicts) | baseline tolerance, semantic linkage, `contract-drift-stopped` distinct status, flags collapsed to one |
 
-**Backwards compat**: v2.5–v2.15 program.md without Takeaway section
-gets clear migration path (`--migrate-takeaway`); other v2.16 fields
-(baseline tolerance default, create: marker for new files, Strategy
-≥2 axes hard-check) require manual program.md fix. Loud-fail beats
-quiet-helpful for fields where automated migration would be silent
-fabrication.
+### Backwards compat
 
-**Cost**: +$0.10/start (dissect program-adversary). On a typical
-$3-5 multi-round campaign this is 2-3% overhead, 50× ROI on a single
-56-round-fuzz catch.
+v2.5-v2.15 program.md without Takeaway → `--migrate-takeaway` (Takeaway-only draft + exit). Other v2.16 fields (baseline tolerance default, `create:` marker, Strategy ≥2 axes) require manual fix. Loud-fail beats quiet-helpful where automated migration = silent fabrication.
+
+### Cost
+
++$0.10/start (dissect program-adversary). On $3-5 multi-round campaign = 2-3% overhead. 50× ROI on a single 56-round-fuzz catch.
