@@ -35,13 +35,7 @@ description: >
   abstraction layers. Goal-authoring is not a separate mode; it is the
   loop operating on the goal as the artifact.
 
-  **Peer configuration** (NOT modes — these select which LLM plays each
-  peer slot, the loop discipline is identical):
-  - `--peers=claude+claude` (Claude Code default) — same family, different
-    context-framing per peer at SAME max-effort tier (not via downgrading)
-  - `--peers=claude+codex` — cross-family priors (highest diversity, high stakes)
-  - `--peers=codex+codex` (Codex CLI default) — same family, different
-    context-framing per peer
+  **Peer configuration** is auto-detected from driver (Claude Code → `claude+claude`; codex CLI → `codex+codex`). Cross-family `claude+codex` is opt-in via program.md `Peer policy: cross-family` (doubles cost, requires both LLMs available).
 
   Cost 2× per round vs single-peer review tools but ~1.5× fewer rounds for
   non-trivial work (~33% net overhead) — empirically validated on
@@ -76,7 +70,7 @@ description: >
   codex / off) into ONE loop with peer configuration; legacy flags
   deprecated, see Migration section.
 user-invocable: true
-argument-hint: 'abelian program.md [--peers=claude+claude|claude+codex|codex+codex] [--chains=C] [--depth=L] [--candidates=M] [--portfolio=K] [--code-review=on] | abelian --mission "<fuzzy text>" [--target-hint <paths>] [--interactive-sharpening]'
+argument-hint: 'abelian program.md  |  abelian --mission "<fuzzy text>"  |  abelian --mission-file <path>'
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent, Skill
 ---
 
@@ -84,14 +78,14 @@ allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent, Skill
 
 Two peers each propose AND attack each other's proposals → keep/revert by goal-progress + attack-survival → mutual inspiration → repeat. Goal-met / no-proposal-after-K-frame-breaks / mutual-KILL = converge. Learnings auto-persist to `docs/solutions/` for future sessions.
 
-Defaults: peer challenge always on (no off-switch); 2-peer pair (default `claude+claude` Claude Code, `codex+codex` codex CLI; `--peers=claude+codex` cross-family for high-stakes); portfolio K=1; mechanism-converge termination (no rounds/budget/wallclock cap).
+Defaults: peer challenge always on (no off-switch); same-family 2-peer pair auto-detected from driver; portfolio K=1; mechanism-converge termination (no rounds/budget/wallclock cap). Cross-family pair, search shape, code-review supplemental, etc. declared in program.md (no CLI flags).
 
 ## What You Need
 
 A `program.md` with these sections:
 
 - **Goal** — one sentence (≤200 chars). v2.16 hard-checks for measurable noun (whitelist `number | percentage | sharpe | recall | runtime | file-count | pass-rate | precision | latency | throughput | bytes | count`); standalone process-verbs (`improve | better | investigate | explore | study | examine | analyze`) are rejected as too fuzzy. Truly unspecified-metric tasks belong in `ce-brainstorm`, not abelian.
-- **Task class** *(v2.14)* — one of `code | research | audit | decision | doc | mixed`. Determines mandatory Attack Classes coverage (see "Attack Class Library" below). If absent, loop emits LOUD WARNING (console + `escalations.md` + `state.json` + History row) and defaults to `task: code` for backwards-compat with v2.5+ program.md — same loud-degradation pattern as `--adversary=codex` graceful fallback. The warning explicitly invites the author to add the field; absent-field is operational, not refusal-to-start, but it is loud. For `task: mixed` campaigns (e.g., a code refactor that also rewrites the README), declare a primary class on the first line and supplementary classes after a `;`: `task: code; doc` — the loop applies BOTH library mandates.
+- **Task class** — one of `code | research | audit | decision | doc | mixed`. Determines mandatory Attack Classes coverage. If absent, loop emits LOUD WARNING (stderr + `escalations.md` + state.json + History row) and defaults to `code` for v2.5+ backwards-compat. `task: mixed` declares primary + supplementary classes (`task: code; doc` applies both library mandates).
 - **Target** — files the agent may edit. v2.16 hard-checks each path's parent directory exists, and each path either (a) exists, OR (b) has explicit `create:` marker (e.g., `Target: docs/new-design.md create:`) declaring it will be created. Inside-repo only (no `..` escape, no absolute paths outside repo root).
 - **Eval** — shell command outputting a number (preferred) OR `self-judge` with a frozen rubric. For non-`code` task classes, see INVARIANTS rule #8 fuzzy-ground protocol — `Eval ground:` declaration required. v2.16: round-0 runs Eval ONCE against unmutated baseline, stores result in `$RUN_DIR/round-0/eval.txt`, validates against declared Metric.baseline within Metric.tolerance.
 - **Eval ground** *(v2.14, required for non-`code` task classes per INVARIANTS rule #8)* — declared ground source(s): ≥1 of (b)/(c)/(d) options from rule #8; option (a) self-ground is supplementary only.
@@ -102,6 +96,12 @@ A `program.md` with these sections:
 - **Attack Classes** *(v2.5, expanded v2.14)* — taxonomy of attack vectors the adversary MUST address each round (or explicitly mark `n/a-this-target` with grep-able trace). Default 7 classes always apply; non-`code` tasks MUST opt in to ≥1 named library (research-class / audit-class / decision-class / doc-class). See "Attack Class Library" section below. v2.16: at round-0 program-adversary uses a LOCKED set independent of program.md Attack Classes — `{c1-scope-drift, c2-hidden-assumption, c3-definition-elasticity, c4-authority-by-citation, d4-scope-creep}` — for program-contract integrity check.
 - **Takeaway** *(v2.16, NEW required section)* — derived contract: 3 fields, each must trace to Goal/Eval/Metric/Constraints via quote-grep + semantic linkage. NOT a parallel truth source; gate fails on Takeaway-vs-source contradiction. See "Round-0 Authoring Gate" section below for the Takeaway schema and rule #16 for full enforcement.
 - **History** — auto-populated by the loop
+
+**Optional sections** (declare in program.md to override defaults; no CLI flags):
+
+- **Shape** — `chains: 1 / depth: 1 / candidates: 1 / portfolio: 1` (per-round compute levers; bump only when Strategy has independent axes / eval rich enough for refinement / variance high / multiple cells worth keeping)
+- **Peer policy** — `same-family` (default) | `cross-family` (claude+codex; doubles cost, requires both LLMs available)
+- **Code review** — `on` (rule #12 supplemental code-quality gate; default off — cost roughly doubles per round)
 
 ## Round-0 Authoring Gate (v2.16) — INVARIANTS rule #16
 
@@ -132,14 +132,14 @@ Quote-grep + semantic linkage (rule #16 B): Success cites Goal phrase + Metric n
 ### Round-0 gate steps (full spec: rule #16)
 
 1. **Hard checklist** (binary fast-fail): all program.md fields per "What You Need" + Takeaway 3 fields present.
-2. **Baseline eval**: run Eval once on unmutated tree → `round-0/eval.txt`; validate against `Metric.baseline ± Metric.tolerance`. Mismatch → refuse OR `--accept-measured-baseline` + re-confirmation.
+2. **Baseline eval**: run Eval once on unmutated tree → `round-0/eval.txt`; validate against `Metric.baseline ± Metric.tolerance`. Mismatch → TTY prompt "measured X vs declared Y; accept measured? (y/edit/abort)". Non-TTY → exit `gate-failed-terminal` with edit instructions.
 3. **Program-peer-challenge**: spawn dissect peer with locked attack classes `{c1, c2, c3, c4, d4}` → `round-0/program-peer-challenge.txt` with rule #11 header (`peer: program-gate`). BLOCKER → refuse; MAJOR → stderr + escalations.md.
-4. **Contract hash**: sha256 over normalized program-contract sections; stored in `state.round_0.program_contract_hash`. Per-round refresh (rule #3) recomputes; mismatch → `contract-drift-stopped` + `reconfirmation_required`. Resolution: new RUN_ID OR `--reconfirm-gate`.
-5. **Confirmation (TTY-aware)**: print Takeaway + baseline + peer-challenge verdict + contract hash + cost shape → wait stdin "go"/"no" (no timeout). Non-TTY refuses unless `--auto-launch-after-gate`.
+4. **Contract hash**: sha256 over normalized program-contract sections; stored in `state.round_0.program_contract_hash`. Per-round refresh (rule #3) recomputes; mismatch → `contract-drift-stopped`. Resolution: new RUN_ID OR re-run `abelian program.md` (TTY prompt re-runs round-0 with new hash).
+5. **Confirmation**: print Takeaway + baseline + peer-challenge verdict + contract hash + cost shape → TTY prompt "go/no" (no timeout). Non-TTY: exit `gate-failed-terminal` with the printed summary so user can review and re-invoke (no auto-launch in non-TTY — peer-challenge cost requires explicit human go).
 
 ### Migration & pre-flight
 
-`abelian program.md --migrate-takeaway` drafts Takeaway only + exits (never autostarts). Other v2.16 gaps require manual fix.
+v2.x program.md missing `## Takeaway` → round-0 hard checklist fails → TTY prompt "draft Takeaway from Goal/Eval/Metric/Constraints? (y/n)". On `y`: writes Takeaway to program.md + emits diff + exits (user reviews + commits + re-invokes). Other v2.x gaps (no baseline, Strategy <2 axes, missing Eval ground) require manual fix — automated migration of more fields = silent fabrication.
 
 Pre-flight `.gitignore`: ensure language build artifacts ignored before round 1 (Python `__pycache__/`, Node `node_modules/`, Rust `target/`, Go `vendor/`, C/C++ `build/` + `*.o/*.so/*.a`). Missing pattern → drift-stopped on round 1.
 
@@ -148,10 +148,8 @@ Pre-flight `.gitignore`: ensure language build artifacts ignored before round 1 
 Triggered by `abelian --mission "<fuzzy text>"`. Rule #17 is abelian's native compiler from fuzzy mission to rule #16-compliant program.md draft. Same propose+attack discipline as the round loop, applied at goal-authoring level.
 
 ```bash
-abelian --mission "<fuzzy text>"                 # string
-abelian --mission-file <path>                    # file
-abelian --mission "..." --target-hint <paths>    # bound reconnaissance
-abelian --mission "..." --interactive-sharpening # 5 mini-confirms
+abelian --mission "<fuzzy text>"     # string
+abelian --mission-file <path>        # file (may include `Target hint:` section to bound reconnaissance)
 ```
 
 File auto-detect: `abelian <existing-file>` lacking `## Goal` → prompt "Run goal-authoring stage? (y/n)". Bare strings NEVER auto-classified (typo risk).
@@ -170,7 +168,7 @@ Pass 0 exits early on `sharp` (already program.md-grade) or `fuzzy-ungrounded` (
 
 ### Bounded reconnaissance
 
-Reads only: fuzzy mission text, `--target-hint` paths, top-3-noun keyword grep, last 200 lines of session history. Forbidden: full repo TODOs, CLAUDE.md, full git log. Each citation recorded in trace.json with `citation_type` (`user_message | target_hint | grep_hit | session_tail`).
+Reads only: fuzzy mission text, optional `Target hint:` paths declared in mission-file, top-3-noun keyword grep, last 200 lines of session history. Forbidden: full repo TODOs, CLAUDE.md, full git log. Each citation recorded in trace.json with `citation_type` (`user_message | target_hint | grep_hit | session_tail`).
 
 ### Cost
 
@@ -214,33 +212,32 @@ Mutator workflow:
 
 Full schema + field rules: rule #14. Commit-gate: rule #2 check 8 (completeness + freshness + selection_reason trade-off cited) + check 10 (goal-progress: `metric_delta > 0` OR `blocker_status ∈ {removed, partially}` OR `exploration_round: true` with `frame_break_count_consecutive ≤ 2`).
 
-## Search Shape (v2.4) — C × L × Candidates
+## Search Shape
 
-Default: **C=1, L=1, candidates=1** — one mutation per round, sequential. The Loop section below describes this case; most campaigns run here and should not bump these levers without cause.
+Default `chains=1, depth=1, candidates=1, portfolio=1` — one mutation per round, sequential. Most campaigns run here.
 
-For harder problems, factor compute across three orthogonal levers:
+For harder problems, declare in program.md `## Shape`:
 
-| Lever | What it does | Default | When to bump |
-|---|---|---|---|
-| `--chains=C` | Parallel approaches — each chain explores a different Strategy axis on ephemeral branches `abelian/chain-<c>/` | 1 | Strategy has ≥2 independent pre-identified axes (no cross-deps) |
-| `--depth=L` | Sequential refinement within a chain (each step uses prior eval feedback) | 1 | Eval output rich + single-shot rarely hits target |
-| `--candidates=M` | Per-step variants — generate M, pick by eval, rejects logged | 1 | Eval cheap AND single-sample variance high |
-| `--portfolio=K` | K diverse cells across rounds (MAP-Elites) — orthogonal to C/L/M | 1 | Multiple valid mechanisms worth keeping per cell |
+| Lever | What it does | When to bump |
+|---|---|---|
+| `chains: C` | parallel chains — each explores a different Strategy axis | Strategy has ≥2 independent pre-identified axes |
+| `depth: L` | sequential refinement within a chain (uses prior eval feedback) | Eval output rich + single-shot rarely hits target |
+| `candidates: M` | per-step best-of-M variants (rejects logged) | Eval cheap AND single-sample variance high |
+| `portfolio: K` | K diverse cells across rounds (MAP-Elites) | Multiple valid mechanisms worth keeping per cell |
 
-Per-round cost: `Eval runs = C×L×M`, peer-challenge calls = `C×L×2` (2 peers each round). Fix-iter multiplier ~1.5×. Typical convergence 3-10 rounds.
+Per-round cost: `Eval runs = C×L×M`, peer-challenge calls = `C×L×2`. Fix-iter multiplier ~1.5×. Typical convergence 3-10 rounds.
 
 ### Invocation
 
 ```
-abelian program.md \
-  [--peers=claude+claude|claude+codex|codex+codex] \
-  [--chains=C] [--depth=L] [--candidates=M] [--portfolio=K] \
-  [--code-review=on]
-
-abelian --mission "<fuzzy text>" [--target-hint <paths>] [--interactive-sharpening]
+abelian program.md                          # sharp contract
+abelian --mission "<fuzzy text>"            # fuzzy mission, string
+abelian --mission-file <path>               # fuzzy mission, file
 ```
 
 No `--rounds`, `--budget`, or wallclock flags — mechanism-converge per rule #6. Manual abort: SIGINT.
+
+All other behavior (peer pair, search shape, code-review supplemental, baseline acceptance, contract drift re-entry, takeaway migration, non-TTY autostart) is set in program.md sections OR resolved at TTY-interactive prompts during round-0 / drift events. No CLI flag soup.
 
 ## The Loop
 
@@ -251,7 +248,7 @@ For each round:
 2. **Mutate** — apply the change (minimal, one idea per round). Before writing, snapshot pre-files: `mkdir -p $RUN_DIR/round-N && { git ls-files -z; git ls-files -z --others --exclude-standard; } | sort -zu > $RUN_DIR/round-N/pre-files.txt`. INVARIANTS rule #5.
 3. **Evaluate** — run eval command, or self-judge against frozen rubric. Write metric value to `$RUN_DIR/round-N/eval.txt` and update `state.rounds[N].metric_value`.
 4. **Peer challenge** — spawn one peer subagent per configured peer (default 2: peer-A + peer-B), each running `prompts/dissect.md inlined` (Claude) or `codex exec` (codex CLI) on the diff + eval output. Each peer MUST write its full attack list (or `n/a-this-target` per class) to `$RUN_DIR/round-N/peer-<slot>.txt` BEFORE returning. Each peer's verdict line MUST be recorded in `state.rounds[N].peer_<slot>_verdict_line`. INVARIANTS rules #1, #7, #18. (See Peer Challenge section.)
-5. **Confirm** — run commit-gate (rule #2, 10 always-on + 1 conditional). Always-on: peer-{A,B}.txt non-empty + nonce match + mtime + verdict in body (1-4) + drift + pre-files + eval match (5-7) + mission_thread complete & fresh (8) + evidence_class enum (9) + goal-progress required (10). Conditional: codex-review clean of P1/P2 when `--code-review=on` (11). Pass → `git commit`. Fail → revert. Attacks (rule #18 COUNTER) convert to probes; probe-fail → revert.
+5. **Confirm** — run commit-gate (rule #2, 10 always-on + 1 conditional). Always-on: peer-{A,B}.txt non-empty + nonce match + mtime + verdict in body (1-4) + drift + pre-files + eval match (5-7) + mission_thread complete & fresh (8) + evidence_class enum (9) + goal-progress required (10). Conditional: codex-review clean of P1/P2 when program.md declares `Code review: on` (11). Pass → `git commit`. Fail → revert. Attacks (rule #18 COUNTER) convert to probes; probe-fail → revert.
 6. **Place** — K=1 mode: replace champion if better, else revert. K>1 mode: replace THIS cell's incumbent only if it beats that cell's score. New cell label → seed that cell.
 7. **Record** — append to History: kept/reverted/error, cell, adversary-result, metric delta.
 8. **Adapt** — 5 consecutive reverts → shift strategy. 5 rounds with no new cell filled (K>1) → write to `escalations.md`. All directions exhausted → stop early.
@@ -264,7 +261,7 @@ Each peer's CHALLENGE phase (rule #18 COUNTER mode) may also write an informatio
 
 ### Pair configuration
 
-`--peers=<A>+<B>` selects the peer-tool pair. Diversity comes from DIFFERENT CONTEXT FRAMING per peer at SAME max-effort tier (don't downgrade one peer).
+Driver default is same-family (`claude+claude` for Claude Code; `codex+codex` for codex CLI). Cross-family `claude+codex` opt-in via program.md `Peer policy: cross-family`. Diversity comes from DIFFERENT CONTEXT FRAMING per peer at SAME max-effort tier (don't downgrade one peer).
 
 | Pair | Diversity source | When |
 |---|---|---|
@@ -309,7 +306,7 @@ Resets `frame_break_count_consecutive = 0` on any round with `metric_delta > 0` 
 | 4 | Goal re-paraphrase from current state | Mutator writes fresh `goal_paraphrase` based on current metric vs target gap; allow ≤2 speculative routes (`est_metric_delta: "unknown"`) bounded by `frame_break_count_consecutive ≤ 2` | re-paraphrased goal + speculative routes |
 | 5 | Cross-peer alternative_routes mining | Promote each peer's informational `alternative_routes` (with `est_metric_delta > 0`) into the OTHER peer's next-round `candidate_routes` | promoted routes |
 
-**Step 4 abort to round-0 instead of in-frame re-paraphrase** when contract invalidity surfaces (rule #16 I): metric_delta direction inverts (≥ `Metric.tolerance`); `Takeaway.Validated_by` stops being grep-able/runnable; program-contract hash mismatch. Sets `state.round_0.reconfirmation_required = true`. Resume via `--reconfirm-gate`.
+**Step 4 abort to round-0 instead of in-frame re-paraphrase** when contract invalidity surfaces (rule #16 I): metric_delta direction inverts (≥ `Metric.tolerance`); `Takeaway.Validated_by` stops being grep-able/runnable; program-contract hash mismatch. Sets `state.round_0.reconfirmation_required = true`. Resume by re-invoking `abelian program.md` — TTY prompt walks user through fresh round-0 gate; non-TTY: exit with diagnostic.
 
 ### Termination via `no-proposal-after-K-frame-breaks`
 
@@ -422,13 +419,13 @@ Self-judge shares the mutator's biases (the v1 caveat). Hierarchy of evals, best
 
 When self-judge is unavoidable:
 - Rubric frozen in `program.md` Metric BEFORE loop starts (no rubric drift mid-run)
-- Peer challenge MUST be on — loop refuses to start without configured peers (v2.x `--adversary=off` is refused in v3.0; v3.0 has no off-switch for peer challenge)
+- Peer challenge MUST be on — loop refuses to start without configured peers (no off-switch)
 - Self-judge runs in a separate `Agent` call from the mutator, no shared context
 - **Schema-grounding required (v2.2)** — if the mutation references external schema (file paths, column names, API contracts, stored data formats, function signatures), the self-judge MUST verify each reference against the actual source (`Read` the file, run a SQL probe, hit the API) BEFORE scoring. A self-judge that scored ≥ rubric_max without a grounding step is structurally untrustworthy and must be re-scored as 0 on the affected dimensions. Pre-emption ("I expect adversary will probe X") catches things you already know to look for; grounding catches the unknown unknowns. Added after abelian's own first real run (Polymarket Round 1, 2026-04-22) where 2 BLOCKER typos were 4/4 self-judged then immediately caught by Codex SQL grounding.
 
 LLMs never argue "this is better." They argue "this passes/fails the rubric." Verdicts are red/green, not vibes.
 
-## Portfolio Mode (`--portfolio=K`, default K=1)
+## Portfolio Mode (`portfolio: K` in program.md `## Shape`, default K=1)
 
 With K>1: maintain top-K solutions indexed by behavior cell.
 
@@ -464,7 +461,7 @@ Valid termination conditions (full spec: rule #6):
 
 **Self-check before terminating**: write `state.termination = {condition, evidence, rounds_at_termination, frame_break_count_consecutive, rule6_self_check}` block. `evidence` must cite verbatim eval/state. For `no-proposal-after-K-frame-breaks`, `evidence` MUST include `frame_break_steps_run` array showing applicable steps actually executed; missing → gate-fail.
 
-**Contract-drift re-entry**: `contract-drift-stopped` (rule #16 hash mismatch) is paused, not terminated. Resume: `abelian program.md --reconfirm-gate` (same RUN_ID) re-runs round-0 with fresh checklist/baseline/peer-challenge/hash; on approval clears state. Alternative: new RUN_ID.
+**Contract-drift re-entry**: `contract-drift-stopped` is paused, not terminated. Re-invoke `abelian program.md` with same RUN_ID → loop detects existing state + drift → TTY prompt walks user through fresh round-0 (new checklist/baseline/peer-challenge/hash); on approval clears state. Non-TTY: exit with diagnostic. Alternative: new RUN_ID.
 
 ## When It Ends: Auto-Compound
 
@@ -492,20 +489,7 @@ Doc-only target: `termination_requires_execution_gate: false` declared + downstr
 
 ## Migration
 
-v2.x → v3.0 deprecation map: see [MIGRATION.md](MIGRATION.md).
-
-Brief legacy flag map (loop emits stderr warning + writes `escalations.md` per deprecated flag observed):
-
-| v2.x | v3.0 |
-|---|---|
-| `--mode=co-research` | warn + no-op |
-| `--mode=unilateral` | warn + EXIT (use a different review tool) |
-| `--adversary=dissect/codex` | warn + map → `--peers=` |
-| `--adversary=both` | warn + map → `--peers=claude+codex` + `--code-review=on` |
-| `--adversary=off` | REFUSED |
-| `abelian sharpen "..."` | warn + map → `abelian --mission "..."` |
-
-Header `ABELIAN-ADV-v1` legacy-readable; new peer calls emit only `ABELIAN-PEER-v1`. Removed in v3.2.
+v2.x → v3.0 deprecation map (legacy flags, header rename, file layout): see [MIGRATION.md](MIGRATION.md). Loop warns + maps observed legacy flags at startup (writes notice to stderr + `escalations.md`).
 
 ## Safety Rules
 

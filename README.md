@@ -58,7 +58,7 @@ Single-axis verification (typo fix, single-axis verify, ship-prep against known 
 | # | Rule | Notes |
 |---|---|---|
 | 1 | Adversary output on disk | not conversation context |
-| 2 | Commit-gate (10 always-on + 1 conditional) | adversary file / nonce / mtime / verdict / drift / pre-files / eval / mission_thread (#14) / evidence_class (#15) / goal-progress (#14); +codex-review when `--code-review=on` |
+| 2 | Commit-gate (10 always-on + 1 conditional) | peer files / nonce / mtime / verdict / drift / pre-files / eval / mission_thread (#14) / evidence_class (#15) / goal-progress (#14); +codex-review when program.md `Code review: on` |
 | 3 | Per-round refresh | cat INVARIANTS.md + state.json |
 | 4 | Drift check | expected_head + branch + dirty-tree before any commit/revert. v2.16 distinguishes `contract-drift-stopped` (rule #16 hash mismatch) from ordinary `drift-stopped` |
 | 5 | Pre-files snapshot | git ls-files inventory (revert tax) |
@@ -68,7 +68,7 @@ Single-axis verification (typo fix, single-axis verify, ship-prep against known 
 | 9 | Execution gate | adversary-exhaustion alone insufficient |
 | 10 | Production-runtime safety | cron/supervisor/watchdog edits need extra discipline |
 | 11 | Peer challenge header block | `ABELIAN-PEER-v1` + nonce + timestamp + `evidence_class:`. Peers may add informational `alternative_routes:` after attacks. (v3.0 rename from `ABELIAN-ADV-v1`; legacy double-read during deprecation) |
-| 12 | Code Review supplemental gate | opt-in `--code-review=on`; refuse on `[P1]`/`[P2]` |
+| 12 | Code Review supplemental gate | opt-in via program.md `Code review: on`; refuse on `[P1]`/`[P2]` |
 | 13 | Self-attack is not adversary | conversation-level "I attacked own propose" without spawn = unilateral self-judge (rule #8 degraded), NOT co-research. 17× catch-rate gap (2026-04-29) |
 | 14 | Mission Thread per round (v2.15) | 7-field block; goal_paraphrase fresh; ≥2 candidate_routes; selection_reason cites trade-offs; mission_relevance traces Takeaway.Validated_by |
 | 15 | Evidence Class enum (v2.15) | adversary header gains `evidence_class:` `theoretical / paper / replay / settled / dry_run / live` |
@@ -146,7 +146,7 @@ python3 bench.py | tail -1
 - Constraints: pure stdlib, no numpy (Constraints: cited above)
 ```
 
-Default peers: `claude+claude` (different context-framing per peer, Claude Code) or `codex+codex` (codex CLI). High-stakes cross-family: `--peers=claude+codex`. Ship-prep: `--code-review=on` (rule #12 supplemental). Fuzzy mission: `abelian --mission "<text>"`. No `--rounds` / `--budget` flags — mechanism-based termination per rule #6. Manual abort: SIGINT. Legacy v2.x flags (`--mode=`, `--adversary=`, `abelian sharpen`) deprecated; see Migration in SKILL.md.
+Default peers auto-detected from driver (`claude+claude` Claude Code; `codex+codex` codex CLI). Cross-family `claude+codex`, search shape (chains/depth/candidates/portfolio), code-review supplemental — all declared in program.md (no CLI flags). Fuzzy mission: `abelian --mission "<text>"`. Mechanism-based termination per rule #6 (no rounds/budget/wallclock cap). Manual abort: SIGINT. Legacy v2.x flags deprecated → see [MIGRATION.md](MIGRATION.md).
 
 ## Version
 

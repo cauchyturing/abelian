@@ -14,16 +14,13 @@ Or `git clone https://github.com/Abel-ai-causality/abelian.git ~/.claude/skills/
 ## Invocation
 
 ```
-/abelian program.md
+/abelian program.md                  # sharp contract
+/abelian --mission "<text>"          # fuzzy mission
+/abelian --mission-file <path>       # fuzzy mission, file
 ```
-
-| Flag | Effect |
-|---|---|
-| `--mode=co-research` (default) | two Claude peers, different context-framing, propose+attack each round |
-| `--mode=unilateral` | single mutator + dissect adversary (1× cost) |
-| `--adversary=codex` | cross-family priors via `Bash` → `codex exec` subprocess (loud-degrades to `dissect` if unavailable) |
-| `--code-review=on` | rule #12 supplemental gate via `codex review --uncommitted` |
 
 Abort: Ctrl+C → `status=interrupted`.
 
-Peer dispatch: `Agent(general-purpose)` with `prompts/dissect.md` inlined into the prompt (single source of truth shared with codex-cli driver). Spec: [`../../SKILL.md`](../../SKILL.md) + [`../../INVARIANTS.md`](../../INVARIANTS.md). v3.0 removed `Skill('dissect')` standalone registration; methodology lives in `prompts/dissect.md` only.
+All other behavior (peer pair, search shape, code-review supplemental, etc.) is set in program.md sections OR resolved at TTY-interactive prompts during round-0 / drift events. No CLI flag soup.
+
+Peer dispatch: `Agent(general-purpose)` with `prompts/dissect.md` inlined into the prompt (single source of truth shared with codex-cli driver). v3.0 removed `Skill('dissect')` standalone registration; methodology lives in `prompts/dissect.md` only. Spec: [`../../SKILL.md`](../../SKILL.md) + [`../../INVARIANTS.md`](../../INVARIANTS.md).

@@ -60,7 +60,7 @@ no longer produced. See Migration section.
     AND exploration_round = false` is gate-fail. This is the structural
     enforcement of "attack must serve goal, not exist for its own sake."
 
-11. **Code Review supplemental (conditional, rule #12, opt-in via `--code-review=on`)** —
+11. **Code Review supplemental (conditional, rule #12, opt-in via program.md `Code review: on`)** —
     `$RUN_DIR/round-N/codex-review.txt` exists, non-empty, AND contains
     no `[P1]` or `[P2]` severity markers. Skipped silently (with loud
     notice) if codex CLI unavailable, per rule #12 graceful degradation.
@@ -124,7 +124,7 @@ paths:
   human investigates which process / edit caused it.
 - `contract-drift-stopped` (rule #16) — program.md itself was edited
   after round-0 confirmation; human either starts a new run with new
-  hash, OR explicitly re-gates with `--reconfirm-gate` flag (re-runs
+  hash, OR explicitly re-gates with TTY-prompt walk-through (re-runs
   full round-0 authoring gate, prints new takeaway + new estimated
   cost, awaits new "go").
 
@@ -351,7 +351,7 @@ evidence_class: theoretical | paper | replay | settled | dry_run | live
 
 ## 12. Code Review supplemental gate (opt-in, v2.11+)
 
-`--code-review=on` enables an additional code-quality review layer that
+program.md `Code review: on` enables an additional code-quality review layer that
 runs **after** rule #1's dissect/codex adversary call and **before**
 rule #2's commit-gate. It uses codex CLI's purpose-built `codex review`
 subcommand (with its built-in P1/P2/P3 severity schema) — separate from
@@ -377,7 +377,7 @@ yet committed). If `node` is not in PATH, prefix with `bun
 /path/to/codex` (per `~/.bashrc` shim convention).
 
 **Commit-gate addition** (rule #2 conditional check 11, when
-`--code-review=on`):
+program.md `Code review: on`):
 
 11. `$RUN_DIR/round-N/codex-review.txt` exists, non-empty, AND contains
     no `[P1]` or `[P2]` severity markers.
@@ -389,7 +389,7 @@ propose differently next round. Up to the orchestrator's discretion;
 the gate-check itself is binary.
 
 **Graceful degradation** (loud, never silent):
-- `--code-review=on` + codex CLI unavailable (binary missing OR
+- program.md `Code review: on` + codex CLI unavailable (binary missing OR
   `~/.codex/auth.json` absent) → skip rule #12 only (don't fail loop),
   write notice in 3 places (console + escalations.md + History row)
 - Fall back to rule #2's 10-always-on-check gate (v2.15) with rule #12
@@ -566,13 +566,13 @@ Before round 1, run hard checklist + Takeaway-as-derived-contract + measured bas
 
 ### C. Round-0 baseline eval
 
-Shell-runnable Eval runs ONCE against unmutated tree → `$RUN_DIR/round-0/eval.txt`. Validate parsed value against `Metric.baseline ± Metric.tolerance`. Mismatch → refuse OR `--accept-measured-baseline` (overwrites baseline + re-confirmation). Self-judge mode runs frozen rubric once + stores artifact (rule #8 fuzzy-ground).
+Shell-runnable Eval runs ONCE against unmutated tree → `$RUN_DIR/round-0/eval.txt`. Validate parsed value against `Metric.baseline ± Metric.tolerance`. Mismatch → TTY prompt "measured X vs declared Y; accept measured? (y/edit/abort)" (non-TTY: exit `gate-failed-terminal` with edit instructions). Self-judge mode runs frozen rubric once + stores artifact (rule #8 fuzzy-ground).
 
 Closes the v2.15 gap where `metric_delta > 0` (rule #2 check 10) was poisoned by declarative baselines.
 
 ### D. Round-0 program-peer-challenge (rule #1 + #11 inherited)
 
-Independent of `--peers=` choice, round-0 spawns a single dissect-template peer (~$0.10) — cross-family diversity matters per-round, not at round-0 binary gate. Locked attack classes: `{c1-scope-drift, c2-hidden-assumption, c3-definition-elasticity, c4-authority-by-citation, d4-scope-creep}` (program-contract integrity set).
+Independent of program.md `Peer policy:` choice, round-0 spawns a single dissect-template peer (~$0.10) — cross-family diversity matters per-round, not at round-0 binary gate. Locked attack classes: `{c1-scope-drift, c2-hidden-assumption, c3-definition-elasticity, c4-authority-by-citation, d4-scope-creep}` (program-contract integrity set).
 
 Output: `$RUN_DIR/round-0/program-peer-challenge.txt` with rule #11 ABELIAN-PEER-v1 header (`peer: program-gate`, `evidence_class: theoretical`). Severity: BLOCKER → refuse start; MAJOR → stderr + escalations.md; MINOR → escalations.md only. Invalid output (header missing OR criterion-4 violation) → respawn (max 2) → `gate-failed-terminal`.
 
@@ -580,17 +580,17 @@ Output: `$RUN_DIR/round-0/program-peer-challenge.txt` with rule #11 ABELIAN-PEER
 
 After A-D pass, sha256 over normalized sections: `Goal | Task class | Target | Eval | Eval ground | Metric | Constraints | Strategy | Cells | Attack Classes | Takeaway`. `History` excluded. Stored in `state.round_0.program_contract_hash`.
 
-**Per-round refresh** (rule #3 extension): re-cat program.md, recompute hash, compare. Mismatch → `state.status = "contract-drift-stopped"` (distinct from rule #4 `drift-stopped`) + `reconfirmation_required = true`. Resolution: new RUN_ID OR `--reconfirm-gate` flag re-runs full round-0 with new hash.
+**Per-round refresh** (rule #3 extension): re-cat program.md, recompute hash, compare. Mismatch → `state.status = "contract-drift-stopped"` (distinct from rule #4 `drift-stopped`) + `reconfirmation_required = true`. Resolution: new RUN_ID OR re-invoke `abelian program.md` → TTY prompt walks through fresh round-0 with new hash.
 
 ### F. Confirmation gate (TTY-aware, single flag)
 
 After A-E pass, print stderr summary (Takeaway + baseline eval + peer-challenge verdict + contract hash + cost shape) and:
 - **Interactive TTY**: wait stdin "go"/"no" — no timeout. Ctrl-C → `interrupted`.
-- **Non-TTY**: refuse start unless `--auto-launch-after-gate` (records `auto_launched: true` + `bypass_reason`).
+- **Non-TTY**: exit `gate-failed-terminal` with the printed summary so user can review and re-invoke (no auto-launch — peer-challenge cost requires explicit human go).
 
-### G. Migration: `--migrate-takeaway`
+### G. Takeaway migration (TTY prompt; never autostart)
 
-Drafts ONLY the Takeaway section satisfying B → emits unified diff → exits. Never autostart. Other v2.16 gaps (no baseline, Strategy <2, missing Eval ground) require manual fix — automated migration of more fields = silent fabrication.
+v2.x program.md missing `## Takeaway` → checklist fails → TTY prompt "draft Takeaway from Goal/Eval/Metric/Constraints? (y/n)". On `y`: drafts Takeaway satisfying B → emits unified diff → exits (user reviews + commits + re-invokes). Never autostart. Other v2.x gaps (no baseline, Strategy <2 axes, missing Eval ground) require manual fix — automated migration of more fields = silent fabrication.
 
 ### H. state.round_0 schema
 
@@ -647,7 +647,7 @@ Compiles fuzzy mission to rule #16-compliant program.md draft via per-field adve
 
 ### Bounded reconnaissance
 
-Reads ONLY: fuzzy mission text + `--target-hint` paths + top-3-noun keyword grep (≤1 grep per noun) + last 200 lines session history. Forbidden: full repo TODOs, CLAUDE.md, full git log. Each entry → trace.json `reconnaissance[]` with `{command, hit_count, selected_excerpt_path, selected_excerpt_text, citation_type: user_message | target_hint | grep_hit | session_tail}`.
+Reads ONLY: fuzzy mission text + optional `Target hint:` paths in mission-file + top-3-noun keyword grep (≤1 grep per noun) + last 200 lines session history. Forbidden: full repo TODOs, CLAUDE.md, full git log. Each entry → trace.json `reconnaissance[]` with `{command, hit_count, selected_excerpt_path, selected_excerpt_text, citation_type: user_message | target_hint | grep_hit | session_tail}`.
 
 ### Mechanical converge predicate (Pass 1-3)
 
@@ -672,13 +672,13 @@ Draft assembled from passes (Goal from Pass 1, Eval from Pass 2, Strategy + Cons
   "passes": [{ "n": int, "name": str, "converged_to": str, "files": [str], "user_intervention": null }],
   "program_md_draft_path": str,
   "trace_json_path": str,
-  "recommended_flags": ["--peers=claude+claude" | "--peers=claude+codex"]
+  "recommended_peer_policy": "same-family | cross-family"
 }
 ```
 
 ### trace.json schema (audit trail)
 
-Per-pass `artifact_integrity`: `{path, sha256, nonce, started_at, verdict_line, model_or_peer, retry_count}`. Pass 2 adds `eval_dry_run_parse`: `{command, exit_code, stdout_tail, parsed_value}`. Top-level: `fuzzy_mission_verbatim`, `triage`, `reconnaissance[]`, `passes[]`, `program_md_path`, `recommended_flags`. Full schema verified against rule #18's CHALLENGE-mode falsification form.
+Per-pass `artifact_integrity`: `{path, sha256, nonce, started_at, verdict_line, model_or_peer, retry_count}`. Pass 2 adds `eval_dry_run_parse`: `{command, exit_code, stdout_tail, parsed_value}`. Top-level: `fuzzy_mission_verbatim`, `triage`, `reconnaissance[]`, `passes[]`, `program_md_path`, `recommended_peer_policy`. Full schema verified against rule #18's CHALLENGE-mode falsification form.
 
 ### Cost
 

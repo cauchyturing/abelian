@@ -22,7 +22,7 @@ Mechanics: codex maintains `state.json` via `jq`, generates nonces via `python3 
 
 ## Code Review supplemental gate
 
-`--code-review=on` enables rule #12. Per-round `codex review --uncommitted -c 'model_reasoning_effort="high"'` after adversary call, before commit-gate. Output to `round-N/codex-review.txt`; commit refused on `[P1]`/`[P2]`. Default off (cost ~doubles per round). If `node` not in PATH, prefix with `bun /path/to/codex`.
+program.md `Code review: on` enables rule #12. Per-round `codex review --uncommitted -c 'model_reasoning_effort="high"'` after peer challenge, before commit-gate. Output to `round-N/codex-review.txt`; commit refused on `[P1]`/`[P2]`. Default off (cost ~doubles per round). If `node` not in PATH, prefix with `bun /path/to/codex`.
 
 ## Cross-family adversary (advanced)
 
