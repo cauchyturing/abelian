@@ -1,15 +1,16 @@
 ---
 name: abelian
-version: 2.15.0
+version: 2.16.0
 description: >
   **Adversarial collaboration framework** (Kahneman-style applied to LLM
   dispatch) for deep, innovative, long-horizon iteration with tractable
   doc and testable metric. Two LLM peers each propose AND challenge each
   other; mutual inspiration between rounds; mechanism-converge termination.
-  15 INVARIANTS rules provide long-horizon scaffolding (file-gate, drift,
+  16 INVARIANTS rules provide long-horizon scaffolding (file-gate, drift,
   nonce, anti-compaction, forbidden termination rationales, mission-thread
-  goal-anchor, evidence-class enum) — shared substrate with unilateral
-  review frameworks; not abelian-specific. Two iteration modes:
+  goal-anchor, evidence-class enum, program-contract gate) — shared
+  substrate with unilateral review frameworks; not abelian-specific.
+  Two iteration modes:
 
   - **Co-research mode (default since v2.10, "auto-research-loop")** — two peer
     agents both propose AND challenge each other goal-driven; mutual inspiration
@@ -86,6 +87,28 @@ description: >
   zero mission metric movement — v2.14 had no mechanism to revert
   those rounds; v2.15 does.
 
+  **v2.16 — round-0 program contract gate**: closes the upstream
+  cause that v2.15's per-round mechanisms cannot fix from below
+  (fuzzy program.md → every paraphrase is more fuzz). Rule #16
+  Program Contract Gate runs before round 1: hard checklist (Goal
+  has measurable noun / Target paths exist or have create: marker /
+  Eval shell-runnable or rubric / Metric has baseline+direction+tolerance
+  / Strategy ≥2 axes / Attack Classes ≥1 library / Takeaway section
+  present), Takeaway as DERIVED contract (3 fields with quote-grep +
+  semantic linkage trace to Goal/Eval/Metric/Constraints — not
+  parallel truth source), round-0 baseline eval (closes v2.15
+  metric_delta poisoning by declarative baselines), file-gated
+  round-0 program-adversary (rule #11 protocol; attack classes c1/c2
+  /c3/c4/d4 program-contract-integrity set), program-contract sha256
+  hash (rule #3 per-round refresh recomputes; mismatch →
+  contract-drift-stopped + reconfirmation_required), TTY-aware
+  confirmation (interactive: stdin go/no, no timeout; non-TTY:
+  --auto-launch-after-gate required). Single rule, single new
+  status, single new flag, narrow `--migrate-takeaway` opt-in (drafts
+  only, never autostart). v2.16 designed via 2-round co-research
+  with codex (peer-B); 12 verified-substantive findings integrated
+  (TODO.md "v2.16 Razor history" + co-research log).
+
   Use when user says "abelian", "autoloop", "auto-optimize", "run experiments",
   "optimize this", or "Karpathy loop". The skill name is historical (covers
   unilateral verification too despite "research" framing); future v3.0 may flip
@@ -107,26 +130,126 @@ Mutate → evaluate → **adversary** → keep/revert → repeat. When done, lea
 
 A `program.md` with these sections:
 
-- **Goal** — one sentence
+- **Goal** — one sentence (≤200 chars). v2.16 hard-checks for measurable noun (whitelist `number | percentage | sharpe | recall | runtime | file-count | pass-rate | precision | latency | throughput | bytes | count`); standalone process-verbs (`improve | better | investigate | explore | study | examine | analyze`) are rejected as too fuzzy. Truly unspecified-metric tasks belong in `ce-brainstorm`, not abelian.
 - **Task class** *(v2.14)* — one of `code | research | audit | decision | doc | mixed`. Determines mandatory Attack Classes coverage (see "Attack Class Library" below). If absent, loop emits LOUD WARNING (console + `escalations.md` + `state.json` + History row) and defaults to `task: code` for backwards-compat with v2.5+ program.md — same loud-degradation pattern as `--adversary=codex` graceful fallback. The warning explicitly invites the author to add the field; absent-field is operational, not refusal-to-start, but it is loud. For `task: mixed` campaigns (e.g., a code refactor that also rewrites the README), declare a primary class on the first line and supplementary classes after a `;`: `task: code; doc` — the loop applies BOTH library mandates.
-- **Target** — files the agent may edit
-- **Eval** — shell command outputting a number (preferred) OR `self-judge` with a frozen rubric. For non-`code` task classes, see INVARIANTS rule #8 fuzzy-ground protocol — `Eval ground:` declaration required.
+- **Target** — files the agent may edit. v2.16 hard-checks each path's parent directory exists, and each path either (a) exists, OR (b) has explicit `create:` marker (e.g., `Target: docs/new-design.md create:`) declaring it will be created. Inside-repo only (no `..` escape, no absolute paths outside repo root).
+- **Eval** — shell command outputting a number (preferred) OR `self-judge` with a frozen rubric. For non-`code` task classes, see INVARIANTS rule #8 fuzzy-ground protocol — `Eval ground:` declaration required. v2.16: round-0 runs Eval ONCE against unmutated baseline, stores result in `$RUN_DIR/round-0/eval.txt`, validates against declared Metric.baseline within Metric.tolerance.
 - **Eval ground** *(v2.14, required for non-`code` task classes per INVARIANTS rule #8)* — declared ground source(s): ≥1 of (b)/(c)/(d) options from rule #8; option (a) self-ground is supplementary only.
-- **Metric** — name, direction (min|max), baseline. Testable per positioning — rubric score, count, coverage rate, runtime; not vibes / human-acceptance-only. Tasks that cannot articulate a testable metric are out of scope for abelian (use ce-brainstorm or human discussion).
+- **Metric** — `<name>: <baseline> <direction> [<tolerance>]`. Direction ∈ `{min, max}`. Testable per positioning — rubric score, count, coverage rate, runtime; not vibes / human-acceptance-only. Tasks that cannot articulate a testable metric are out of scope for abelian (use ce-brainstorm or human discussion). **Tolerance (v2.16)**: defaults by type when omitted — `pass-rate / file-count / count` → exact (0); `float / runtime` → epsilon = max(1e-9, 0.01 × |baseline|); noisy benchmarks → repeated_median (5 runs). Tolerance enables baseline validation in round-0 step C without rejecting legitimate measurement noise.
 - **Constraints** — what NOT to do
-- **Strategy** — what to try, in what order
+- **Strategy** — what to try, in what order. v2.16 hard-checks ≥2 axes (chains C>1 and co-research depend on diversity; single-axis = use unilateral mode + a different tool, not abelian).
 - **Cells** *(portfolio mode only)* — diversity axes you want covered (e.g., "memoization", "algorithm-swap", "data-restructure"). Free-text labels.
-- **Attack Classes** *(v2.5, expanded v2.14)* — taxonomy of attack vectors the adversary MUST address each round (or explicitly mark `n/a-this-target` with grep-able trace). Default 7 classes always apply; non-`code` tasks MUST opt in to ≥1 named library (research-class / audit-class / decision-class / doc-class). See "Attack Class Library" section below.
+- **Attack Classes** *(v2.5, expanded v2.14)* — taxonomy of attack vectors the adversary MUST address each round (or explicitly mark `n/a-this-target` with grep-able trace). Default 7 classes always apply; non-`code` tasks MUST opt in to ≥1 named library (research-class / audit-class / decision-class / doc-class). See "Attack Class Library" section below. v2.16: at round-0 program-adversary uses a LOCKED set independent of program.md Attack Classes — `{c1-scope-drift, c2-hidden-assumption, c3-definition-elasticity, c4-authority-by-citation, d4-scope-creep}` — for program-contract integrity check.
+- **Takeaway** *(v2.16, NEW required section)* — derived contract: 3 fields, each must trace to Goal/Eval/Metric/Constraints via quote-grep + semantic linkage. NOT a parallel truth source; gate fails on Takeaway-vs-source contradiction. See "Round-0 Authoring Gate" section below for the Takeaway schema and rule #16 for full enforcement.
 - **History** — auto-populated by the loop
 
-## Pre-Flight (v2.8)
+## Round-0 Authoring Gate (v2.16) — INVARIANTS rule #16
 
-Before the first round, verify `.gitignore` covers the language
-ecosystem's default build artifacts. The drift check (INVARIANTS rule #4)
-treats any dirty file outside the round's plan as drift — including
-untracked `__pycache__/` from a baseline `python3 bench.py` invocation.
-A missing pattern = `drift-stopped` on round 1, the campaign dies before
-landing a single mutation.
+Before round 1 hypothesizes anything, the loop runs a **Program
+Contract Gate**. Without this gate, fuzzy or shallow program.md leaks
+the upstream cause that v2.15's per-round mechanisms cannot fix from
+below: every paraphrase of a fuzzy goal is more fuzz. Rule #16
+enforces hard checklist + Takeaway-as-derived-contract + measured
+baseline + file-gated program-adversary + content hash + TTY-aware
+confirmation, all as a single round-0 stage that runs once before
+round 1.
+
+Full spec in `INVARIANTS.md` rule #16. Practical use:
+
+### Takeaway section schema (NEW required v2.16)
+
+Add to your program.md:
+
+```markdown
+## Takeaway
+- **Success looks like**: <observable end-state, ≤2 lines>
+- **Validated by**: <eval/metric/artifact, MUST be grep-able / runnable / countable>
+- **Constraints**: <≤2 lines>
+```
+
+Each field must:
+- **Success looks like** → cite a verbatim or paraphrased phrase from
+  Goal AND include the Metric `name` + `direction` keywords. Paraphrase
+  requires verbatim original cited inline.
+- **Validated by** → cite a verbatim or paraphrased phrase from Eval or
+  Metric AND be grep-able (literal pattern in named file), runnable
+  (shell command), or countable (measurable count). Aesthetic or
+  reader-experience claims are rejected (same protocol as v2.14
+  doc-task cross-attack criterion 4).
+- **Constraints** → cite ≥1 actual prohibition from program.md
+  `## Constraints` section verbatim or paraphrased.
+
+Quote-grep + semantic linkage (combined per codex round-2 review).
+Quote-grep alone is theatre vulnerable ("Goal: optimize speedup →
+Takeaway: speedup achieved" passes lexically, fails semantically).
+
+**Notably absent**: `Estimated horizon`, `Estimated cost`. v2.16 cuts
+these (codex round-1 attack 6) — they re-introduce v2.9-removed
+cap-thinking through the back door. Cost shape is printed
+informationally in step F below, not committed as program.md contract.
+
+### What the gate runs
+
+1. **Hard checklist** (binary, fast-fail): all program.md fields
+   present + within v2.16 constraints (Goal has measurable noun,
+   Target paths exist or have `create:` marker, Eval shell-runnable
+   or rubric+ground, Metric has baseline+direction+tolerance, Strategy
+   ≥2 axes, Attack Classes ≥1 library, Takeaway 3 fields).
+2. **Round-0 baseline eval**: run Eval once against unmutated baseline,
+   store `$RUN_DIR/round-0/eval.txt`, validate against
+   `Metric.baseline ± Metric.tolerance`. Mismatch → refuse start OR
+   re-run with `--accept-measured-baseline` (overwrites Metric.baseline,
+   re-confirmation required).
+3. **Round-0 program-adversary**: dissect adversary (always, regardless
+   of `--adversary` flag) on program.md with locked attack classes
+   `{c1-scope-drift, c2-hidden-assumption, c3-definition-elasticity,
+   c4-authority-by-citation, d4-scope-creep}` (program-contract
+   integrity classes). Writes `$RUN_DIR/round-0/program-adversary.txt`
+   with rule #11 header (`peer: program-gate`, `evidence_class:
+   theoretical`). BLOCKER → refuse start; MAJOR → stderr + escalations.md.
+4. **Program contract hash**: sha256 over normalized Goal / Task class
+   / Target / Eval / Eval ground / Metric / Constraints / Strategy /
+   Cells / Attack Classes / Takeaway. Stored in
+   `state.round_0.program_contract_hash`. Per-round refresh (rule #3
+   extension) recomputes; mismatch → `state.status =
+   "contract-drift-stopped"` + `reconfirmation_required: true`.
+   Resolution: new RUN_ID OR `--reconfirm-gate` flag.
+5. **Confirmation gate (TTY-aware)**: prints takeaway summary +
+   baseline eval + adversary verdict + cost shape (informational,
+   non-binding) + contract hash → waits stdin "go"/"no" on interactive
+   TTY, or refuses start on non-TTY without `--auto-launch-after-gate`
+   flag. No timeout (Stephen leaves runs unattended).
+
+Cost shape format (printed, NOT committed):
+```
+Mode: <unilateral|co-research>; chains <C>, depth <L>, candidates <M>
+Adversary: <dissect|codex|both>
+Per-round adversary calls: <C × L>
+Termination: mechanism-converge per rule #6 (no rounds/budget cap)
+```
+
+### Migration: `--migrate-takeaway`
+
+For v2.5–v2.15 program.md missing the Takeaway section:
+
+```bash
+abelian program.md --migrate-takeaway
+```
+
+Drafts a Takeaway satisfying the v2.16 schema, writes in-place edit +
+emits unified diff, then **exits without launching the loop**. User
+reviews + commits + re-runs without the flag. Migration is intentionally
+narrow (Takeaway only); other v2.16 gaps (no baseline eval, Strategy
+<2 axes, missing Eval ground) require manual fix.
+
+### Pre-flight `.gitignore` check (v2.8, retained inside round-0)
+
+Before round 1, verify `.gitignore` covers the language ecosystem's
+default build artifacts. The drift check (INVARIANTS rule #4) treats
+any dirty file outside the round's plan as drift — including untracked
+`__pycache__/` from a baseline `python3 bench.py` invocation. A missing
+pattern = `drift-stopped` on round 1, the campaign dies before landing
+a single mutation.
 
 Minimum patterns by language:
 
@@ -194,7 +317,10 @@ Minimal schema:
 }
 ```
 
-Valid run `status`: `running`, `completed`, `interrupted`, `drift-stopped`, `gate-failed-terminal`. (`cap-fired` removed in v2.9 along with the budget cap concept; runs that previously cap-fired now run till mechanism-based converge or manual interrupt.)
+Valid run `status`: `running`, `completed`, `interrupted`, `drift-stopped`, `contract-drift-stopped` (v2.16), `gate-failed-terminal`. (`cap-fired` removed in v2.9 along with the budget cap concept; runs that previously cap-fired now run till mechanism-based converge or manual interrupt.)
+- `drift-stopped` — uncommitted file outside Target (rule #4)
+- `contract-drift-stopped` (v2.16) — program.md sections in the contract-hashed set (Goal / Task class / Target / Eval / Eval ground / Metric / Constraints / Strategy / Cells / Attack Classes / Takeaway) changed after round-0 confirmation. Resolution: new RUN_ID OR `--reconfirm-gate` flag re-runs round-0 (rule #16).
+
 Valid round `status`: `pending`, `mutated`, `eval-done`, `adversary-done`, `kept`, `reverted`, `gate-failed`.
 
 Update after: every round step transition, every commit, every revert,
@@ -212,6 +338,42 @@ status changes, eval results, post-campaign escalation review.
     "frame_break_steps_run": []         // ["reject-pool-mining", ...]
   }
 ]
+```
+
+**v2.16 state schema additions** (round_0 block, populated by Program
+Contract Gate before round 1):
+
+```json
+"round_0": {
+  "checklist_passed": true,
+  "checklist_failures": [],
+  "baseline_eval": {
+    "value": 0.42,
+    "file": "round-0/eval.txt",
+    "tolerance": 0.01,
+    "matches_declared": true
+  },
+  "program_adversary": {
+    "file": "round-0/program-adversary.txt",
+    "verdict": "0 BLOCKER, 1 MAJOR, 2 MINOR",
+    "evidence_class": "theoretical",
+    "blockers": 0,
+    "majors": 1,
+    "minors": 2,
+    "adversary_nonce": "...",
+    "adversary_started_at": "..."
+  },
+  "takeaway": {
+    "success_looks_like": "...",
+    "validated_by": "...",
+    "constraints": "..."
+  },
+  "program_contract_hash": "sha256:...",
+  "user_confirmed_at": "2026-05-03T15:30:00.000-0700",
+  "auto_launched": false,
+  "bypass_reason": null,
+  "reconfirmation_required": false
+}
 ```
 
 `frame_break_count_consecutive` resets to 0 on any round with
@@ -752,6 +914,26 @@ Why: original program.md framing may be exhausted but a re-paraphrase
 from current state surfaces unknown-unknown directions. The bounded
 exploration window prevents the loop from becoming pure exploration.
 
+**v2.16 — abort-to-round-0 conditions**: step 4 distinguishes two
+outcomes (rule #16 boundary):
+
+- **In-frame re-paraphrase** (default): Takeaway and program-contract
+  hash still valid; mutator generates fresh paraphrase from current
+  metric vs target gap; loop continues normally with bounded
+  exploration.
+- **Contract invalidity surfaces** → abort to round-0 with
+  `state.round_0.reconfirmation_required = true`:
+  - `metric_delta` direction inverts mid-run (sign change with absolute
+    value ≥ `Metric.tolerance`) — metric no longer measures the goal
+    as Takeaway claimed.
+  - `Takeaway.Validated_by` stops being grep-able / runnable (e.g.,
+    cited file deleted, cited shell command missing).
+  - Program-contract hash mismatch surfaces during refresh.
+
+Aborting to round-0 is the correct response to contract invalidity:
+the LLM cannot creatively escape a broken contract; only the human
+can re-confirm. Resume after re-confirmation via `--reconfirm-gate`.
+
 **Step 5 — Cross-peer alternative_routes mining (co-research mode only)**
 
 For each peer, read the OTHER peer's most recent `peer-X.txt`
@@ -1039,6 +1221,28 @@ If a mechanism signal would not fire by round 3+K=5, the loop has not actually c
 **Manual abort path** (not a termination condition, an emergency stop):
 - User sends SIGINT (Ctrl+C) or SIGTERM
 - Abelian marks `state.status = "interrupted"`, finishes the current round's atomic operation if mid-commit (per night-shift's "finish current task" pattern), writes handoff/compound-doc with explicit interrupted marker, exits.
+
+**Contract-drift re-entry (v2.16)**: when a run hit
+`status=contract-drift-stopped` (rule #16 program-contract hash
+mismatch during refresh), the run is paused, not terminated. Resume:
+
+```bash
+abelian program.md --reconfirm-gate  # same RUN_ID
+```
+
+Re-runs the full round-0 Program Contract Gate (steps A–F) — fresh
+checklist + fresh baseline eval + fresh program-adversary + new
+contract hash + new confirmation. On approval, sets
+`state.round_0.reconfirmation_required = false`, stores new hash,
+clears `contract-drift-stopped`, and resumes from the next round
+(rounds completed before drift remain valid; mid-drift round if any
+was reverted on the gate trip). State.json gains a
+`reconfirmation_history[]` array recording each re-gate event with
+old hash → new hash transition.
+
+Alternative: start a new RUN_ID with the modified program.md. Choose
+based on whether the contract change is semantically continuous
+(re-confirm same campaign) or a new campaign altogether.
 
 **Self-check before terminating** (mandatory): re-read INVARIANTS rule #6 from disk (rule #3) and verify your claimed reason is on the v2.15 valid list, not the forbidden list. Document the rule-#6 self-check in `state.termination` block:
 

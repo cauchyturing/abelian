@@ -74,7 +74,7 @@ When termination fires, post-campaign escalation review writes locked-template c
 
 For tasks that don't need adversarial collaboration (single-axis verification, ship-prep, audit), switch to `--mode=unilateral` — single mutator + single adversary, 1× cost.
 
-## The 15 INVARIANTS (long-horizon LLM scaffolding)
+## The 16 INVARIANTS (long-horizon LLM scaffolding)
 
 These rules are **scaffolding** — not adversarial-collaboration-specific, but mandatory for any LLM agent loop running >5 rounds. Re-read at start of every round (rule #3 itself).
 
@@ -93,6 +93,7 @@ These rules are **scaffolding** — not adversarial-collaboration-specific, but 
 13. **Self-attack is not adversary** *(v2.12)* — conversation-level "I attacked my own propose" with no spawn / no isolated context / no nonce header is unilateral self-judge (rule #8 degraded mode), not co-research. Empirically validated 17× catch-rate gap (2026-04-29 self-audit dogfood)
 14. **Mission Thread per round** *(v2.15)* — every round must populate 7-field `mission_thread` block (goal_paraphrase fresh vs prior round / metric_delta / blocker_status / mission_relevance / candidate_routes ≥2 LLM-generated alternatives / selected_route_id / selection_reason citing trade-offs). Forces per-round program.md re-read and N-best route enumeration. Closes the v2.10-v2.14 gap where program.md was read once at round 0 but goal-anchor did not propagate per round (codex 56-round PM dogfood 2026-05-02).
 15. **Evidence Class enum in adversary header** *(v2.15)* — adversary header gains mandatory `evidence_class:` line, whitelist `theoretical | paper | replay | settled | dry_run | live`. Prevents cross-layer evidence confusion (v2.14 cron-vs-WS bug class — paper-fill evidence and live-fill evidence both score `n/a` on the same attack class for materially different reasons).
+16. **Program Contract Gate** *(v2.16)* — round-0 authoring + confirmation gate before round 1: hard checklist (Goal has measurable noun / Target paths exist or have `create:` marker / Eval shell-runnable or rubric / Metric has baseline+direction+tolerance / Strategy ≥2 axes / Attack Classes ≥1 library / Takeaway present), Takeaway as DERIVED contract (3 fields with quote-grep + semantic linkage trace to Goal/Eval/Metric/Constraints — not parallel truth), round-0 baseline eval (closes v2.15 metric_delta poisoning by declarative baselines), file-gated round-0 program-adversary on locked classes `{c1, c2, c3, c4, d4}` (rule #11 protocol), program-contract sha256 hash (per-round refresh recomputes; mismatch → `contract-drift-stopped` + `--reconfirm-gate` re-entry), TTY-aware confirmation (interactive: stdin go/no, no timeout; non-TTY: `--auto-launch-after-gate` required). Closes the upstream cause that v2.15's per-round mechanisms cannot fix from below — fuzzy program.md leaks fuzz no matter how disciplined the per-round gates are.
 
 Full text in [INVARIANTS.md](INVARIANTS.md).
 

@@ -19,7 +19,19 @@ Wrap it in a shell function or alias if you'll run it often. The full prompt is 
 The codex session you just launched becomes the **mutator + orchestrator**. For each round:
 
 ```
-0. Refresh        — re-cat INVARIANTS.md + state.json from disk
+-1. Round-0 Program Contract Gate (v2.16, rule #16) — runs ONCE before round 1:
+    A. hard checklist (Goal has measurable noun, Target paths exist or have create:, Eval shell-runnable
+       or rubric+ground, Metric has baseline+direction+tolerance, Strategy >=2 axes, Attack Classes >=1
+       library, Takeaway section present)
+    B. Takeaway = derived contract (Success cite Goal+Metric name+direction; Validated_by cite Eval/Metric
+       and grep-able/runnable/countable; Constraints cite >=1 actual prohibition)
+    C. baseline eval run once at unmutated state -> $RUN_DIR/round-0/eval.txt (validate vs Metric.baseline +/- tolerance)
+    D. dissect program-adversary on locked classes {c1,c2,c3,c4,d4} -> $RUN_DIR/round-0/program-adversary.txt with
+       ABELIAN-ADV-v1 header (peer: program-gate, evidence_class: theoretical)
+    E. sha256 program contract hash over Goal/Task class/Target/Eval/Eval ground/Metric/Constraints/
+       Strategy/Cells/Attack Classes/Takeaway -> state.round_0.program_contract_hash
+    F. TTY-aware confirmation: interactive stdin go/no (no timeout); non-TTY refuses unless --auto-launch-after-gate
+0. Refresh        — re-cat INVARIANTS.md + state.json from disk; recompute program contract hash, mismatch -> contract-drift-stopped
 1. Hypothesize    — propose ONE mutation per Strategy axis (or two peer mutations in co-research mode)
 2. Mutate         — pre-files snapshot, then apply the mutation(s)
 3. Eval           — run program.md `## Eval` shell command, capture metric

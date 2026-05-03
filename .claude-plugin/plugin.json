@@ -1,7 +1,7 @@
 {
   "name": "abelian",
-  "version": "2.15.0",
-  "description": "Adversarial collaboration framework (Kahneman-style applied to LLM dispatch) for deep, innovative, long-horizon iteration with tractable doc and testable metric. Two LLM peers each propose AND challenge each other; mutual inspiration between rounds; mechanism-converge termination. 15 INVARIANTS rules harden against fabrication, drift, compaction, mission drift, and cross-layer evidence confusion. v2.15: telos shift to goal-driven co-research — Mission Thread per round (rule #14, >=2 candidate_routes + selection_reason), Evidence Class enum (rule #15, 6-class ladder), commit-gate goal-progress check, Frame-break Protocol (5-step creative-escape replacing plateau-as-termination).",
+  "version": "2.16.0",
+  "description": "Adversarial collaboration framework (Kahneman-style applied to LLM dispatch) for deep, innovative, long-horizon iteration with tractable doc and testable metric. Two LLM peers each propose AND challenge each other; mutual inspiration between rounds; mechanism-converge termination. 16 INVARIANTS rules harden against fabrication, drift, compaction, mission drift, cross-layer evidence confusion, and program-contract fuzziness. v2.16: round-0 Program Contract Gate (rule #16) — hard checklist + Takeaway as derived contract with quote-grep + semantic linkage + measured baseline eval + file-gated program-adversary + sha256 contract hash + TTY-aware confirmation. v2.15: telos shift to goal-driven co-research via Mission Thread (rule #14), Evidence Class enum (rule #15), Frame-break Protocol.",
   "author": {
     "name": "Stephen",
     "url": "https://github.com/cauchyturing"
@@ -22,6 +22,8 @@
     "anti-compaction",
     "goal-driven",
     "mission-thread",
-    "frame-break"
+    "frame-break",
+    "program-contract",
+    "round-zero-gate"
   ]
 }

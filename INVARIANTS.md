@@ -102,6 +102,24 @@ Any mismatch → set `state.status = "drift-stopped"`, write nothing
 else, terminal-only summary, exit. Do not attempt to "recover" — the
 human must investigate.
 
+**v2.16 — `contract-drift-stopped` distinction**: rule #16 (Program
+Contract Gate) introduces a separate hash-based drift signal over
+program.md sections (Goal / Task class / Target / Eval / Eval ground /
+Metric / Constraints / Strategy / Cells / Attack Classes / Takeaway).
+When the per-round refresh recomputes the contract hash and finds a
+mismatch with `state.round_0.program_contract_hash`, the loop sets
+`state.status = "contract-drift-stopped"` (NOT `drift-stopped`) and
+writes `state.round_0.reconfirmation_required = true`. The two
+statuses are kept distinct because they signal different human-action
+paths:
+- `drift-stopped` (this rule, #4) — uncommitted file outside Target;
+  human investigates which process / edit caused it.
+- `contract-drift-stopped` (rule #16) — program.md itself was edited
+  after round-0 confirmation; human either starts a new run with new
+  hash, OR explicitly re-gates with `--reconfirm-gate` flag (re-runs
+  full round-0 authoring gate, prints new takeaway + new estimated
+  cost, awaits new "go").
+
 ## 5. Pre-files snapshot before mutate
 
 Before step 2 (Mutate) writes anything:
@@ -573,6 +591,20 @@ incomplete mission_thread = commit-gate check 8 fails = revert.
   true` and explain in selection_reason what bounded question is being
   answered.
 
+  **v2.16 trace requirement (commit-gate check 8 extension)**: when
+  rule #16 Program Contract Gate is in effect (i.e., program.md has a
+  `## Takeaway` section + round-0 was confirmed), `mission_relevance`
+  MUST contain ≥1 verbatim or paraphrased phrase from
+  `Takeaway.Validated_by` (the round-0 declared validation source).
+  Paraphrase requires the verbatim original phrase cited inline,
+  e.g., `mission_relevance: "advances scanner.py replay-determinism
+  (Takeaway.Validated_by: 'WS replay produces byte-identical fills')"`.
+  Quote-grep mechanism, same as rule #8 fuzzy-ground. Untraceable
+  mission_relevance → check 8 fails → revert. This closes the gap
+  where mission_relevance could be a vibe ("this serves the goal
+  somehow") rather than a specific contract trace ("this advances the
+  Validated_by criterion declared at round-0").
+
 - `candidate_routes` — ARRAY OF ≥2 entries. The mutator MUST generate
   at least 2 distinct routes per round and document them, even if one
   is obviously chosen. Single-route rounds are commit-gate fail. Routes
@@ -646,3 +678,348 @@ runtime-only classes and flag for re-run with `dry_run` or `live`.
 Choose the strongest class ACTUALLY exercised this round. Inflating
 the class (claiming `live` when only `paper` ran) is silent
 fabrication; rule #11's nonce-friction defense applies.
+
+## 16. Program Contract Gate (v2.16) — round-0 authoring + confirmation
+
+Before round 1 hypothesizes anything, the loop runs a Round-0 Program
+Contract Gate. Without this gate, fuzzy or shallow program.md leaks
+the upstream cause that v2.15's Mission Thread cannot fix from below
+(every paraphrase of a fuzzy goal is more fuzz). Rule #16 enforces:
+hard checklist + Takeaway-as-derived-contract + measured baseline +
+file-gated program-adversary + content hash + TTY-aware confirmation.
+
+The protocol below is mandatory. Skipping any step = round 1 refuses
+to start (`status: gate-failed-terminal`).
+
+### A. Hard checklist (binary, fast-fail)
+
+Computed before adversary spawn or eval call. Refuse start on any
+failure.
+
+- **Goal**: one line, ≤200 chars. MUST contain a measurable noun
+  (whitelist: `number | percentage | sharpe | recall | runtime |
+  file-count | pass-rate | precision | latency | throughput | bytes |
+  count`). Forbidden as standalone Goal verbs (no measurable noun
+  attached): `improve | better | investigate | explore | study |
+  examine | analyze`. Truly unspecified-metric tasks belong in
+  `ce-brainstorm`, NOT abelian.
+- **Target**: list of paths. Each path's parent directory MUST exist.
+  Each path MUST either (a) exist (file or directory), OR (b) include
+  an explicit `create:` marker (e.g., `Target: docs/new-design.md
+  create:`) declaring the path will be created. Inside-repo check
+  required (no `..` escape, no absolute paths outside repo root).
+- **Eval**: shell-runnable command (`bash -c <line>` returns 0 with
+  numeric stdout) OR `self-judge` mode with `Eval ground:` declared
+  per rule #8.
+- **Metric**: `<name>: <baseline> <direction> <tolerance>`. Direction
+  ∈ `{min, max}`. **Tolerance** required (v2.16) — defaults by metric
+  type when omitted: `pass-rate / file-count / count` → `exact (0)`;
+  `float / runtime` → `epsilon = max(1e-9, 0.01 × |baseline|)`; noisy
+  benchmarks → `repeated_median (5 runs)`. Tolerance enables baseline
+  validation in step C without rejecting legitimate measurement noise.
+- **Strategy**: ≥2 axes (chains C>1 and co-research depend on
+  diversity; single-axis means use `unilateral` mode and a different
+  tool, not abelian).
+- **Attack Classes**: ≥1 named library from {default, doc-class,
+  research-class, audit-class, decision-class} OR ≥1 custom domain
+  extension.
+- **Takeaway section** (NEW v2.16, see B below): present with all 3
+  required fields populated.
+
+### B. Takeaway = derived contract (3 fields, not parallel truth)
+
+```
+## Takeaway
+- Success looks like: <observable end-state, ≤2 lines>
+- Validated by: <eval/metric/artifact, MUST be grep-able / runnable /
+  countable per rule #8 fuzzy-ground criterion 4>
+- Constraints: <≤2 lines>
+```
+
+**Quote-grep + semantic linkage** (combines round-1 and round-2 codex
+review):
+
+- `Success looks like` MUST: (a) cite a verbatim or paraphrased phrase
+  from `Goal` (paraphrase requires verbatim original cited inline);
+  AND (b) include the Metric `name` AND `direction` keywords.
+- `Validated by` MUST: (a) cite a verbatim or paraphrased phrase from
+  `Eval` or `Metric`; AND (b) be grep-able (a literal pattern in a
+  named file), runnable (a shell command), or countable (a measurable
+  count). Aesthetic / "feels right" / "reader can follow" =
+  rejected (same protocol as v2.14 doc-task cross-attack criterion 4).
+- `Constraints` MUST cite ≥1 actual prohibition from program.md
+  `## Constraints` section verbatim or paraphrased.
+
+Quote-grep alone is theatre (codex round-2 MAJOR-2: "Goal: optimize
+speedup → Takeaway: speedup achieved" passes lexically but means
+nothing). Quote-grep + semantic linkage is structural. Gate fails
+on any field violating either component.
+
+**Notably absent**: `Estimated horizon`, `Estimated cost`. These were
+in the round-1 draft and were cut per codex round-1 attack 6 — they
+re-introduce v2.9-removed cap-thinking through the back door. Cost
+shape (C×L×M, adversary mode, "mechanism-converge; not a cap") is
+printed as informational summary in step F, but not committed as
+program.md contract.
+
+### C. Round-0 baseline eval (close v2.15 metric_delta integrity)
+
+If Eval is shell-runnable, the loop runs it ONCE at round-0 against
+the unmutated baseline working tree. Output → `$RUN_DIR/round-0/eval.txt`.
+Compare parsed value against `Metric.baseline` within `Metric.tolerance`:
+
+- Match → store `state.round_0.baseline_eval.matches_declared = true`,
+  proceed.
+- Mismatch (beyond tolerance) → refuse start with concrete error
+  (declared baseline 0.80, measured 0.31 at tolerance 0.01); user
+  either fixes program.md baseline OR re-runs with `--accept-measured-baseline`
+  (overwrites Metric.baseline in program.md, requires re-confirmation).
+
+If Eval is `self-judge`, the round-0 baseline runs the frozen rubric
+once on the unmutated state → store judge artifact at
+`$RUN_DIR/round-0/eval.txt` (with rule #8 fuzzy-ground discipline).
+
+Round-0 baseline closes the v2.15 gap where `metric_delta > 0` (rule
+#2 check 10) was poisoned by a declarative baseline that didn't match
+reality.
+
+### D. Round-0 program-adversary (rule #1 + #11 inherited)
+
+Independent of `--adversary` flag, round-0 ALWAYS spawns dissect
+(cheap universal sanity, ~$0.10) — cross-model adversary diversity
+matters per-round, not at round-0 binary gate. Per-round `--adversary=codex|both`
+choice is preserved for rounds 1+.
+
+Spawn: `Agent(general-purpose) running Skill('dissect')` against
+program.md as input. Attack classes locked to the program-contract
+set: `{c1-scope-drift, c2-hidden-assumption, c3-definition-elasticity,
+c4-authority-by-citation, d4-scope-creep}`. These five are the
+program-contract-integrity classes:
+
+- c1: does the doc claim/proposal exceed Goal? (scope drift)
+- c2: what unstated logical premise must hold for this contract to
+  work? (hidden assumption)
+- c3: does "metric" mean different things in Goal / Metric / Eval /
+  Takeaway? (definition elasticity)
+- c4: does Takeaway.Validated_by reference files / commands / claims
+  that exist? (authority-by-citation)
+- d4: does the proposed action stretch beyond stated decision boundary?
+  (scope creep)
+
+Output: `$RUN_DIR/round-0/program-adversary.txt`. Header (rule #11
+inherited verbatim):
+
+```
+ABELIAN-ADV-v1
+run_id: <state.run_id>
+round: 0
+peer: program-gate
+nonce: <state.round_0.adversary_nonce>
+started_at: <ISO 8601 with milliseconds>
+verdict: <single-line verdict>
+evidence_class: theoretical
+---
+<attack content begins; criterion-4 form per v2.14 doc-task>
+```
+
+Severity grades:
+- BLOCKER → refuse start.
+- MAJOR → print to stderr + write to escalations.md, allow start.
+- MINOR → write to escalations.md, allow start.
+
+Invalid output (header missing OR criterion-4 violation) → respawn
+with explicit "criterion-4 violation, retry" prompt. After 2 respawn
+failures → refuse start with `gate-failed-terminal` status.
+
+### E. Program contract hash
+
+After A–D pass, normalize and hash the program-contract sections:
+
+```
+Goal | Task class | Target | Eval | Eval ground | Metric |
+Constraints | Strategy | Cells | Attack Classes | Takeaway
+```
+
+`History` excluded (auto-populated by loop; not part of contract).
+
+Normalization: strip leading/trailing whitespace per section, collapse
+multi-blank-lines, lower-case section header markers. Hash:
+`sha256(normalized_concat)`. Store in
+`state.round_0.program_contract_hash`.
+
+**Per-round refresh** (rule #3 extension): when the loop re-cats
+program.md at round-N step 0, recompute the hash and compare to
+`state.round_0.program_contract_hash`. Mismatch →
+`state.status = "contract-drift-stopped"` (NOT ordinary
+`drift-stopped`) + `state.round_0.reconfirmation_required = true`.
+Resolution paths:
+
+- New run with new RUN_ID and new hash, OR
+- `--reconfirm-gate` flag re-runs full round-0 (steps A–F),
+  prints new takeaway + new estimated cost, awaits new "go".
+  Stores new hash, sets `reconfirmation_required = false`. Loop
+  resumes from round 1 of the same RUN_ID with the new contract.
+
+Hash overhead per round: ~1ms over ~11 sections. Documented as
+load-bearing per rule #3 extension; users should expect it in audit
+trails.
+
+### F. Confirmation gate (TTY-aware, single flag)
+
+After A–E pass, the loop prints to stderr:
+
+```
+=== abelian round-0 program contract gate PASSED ===
+
+Takeaway:
+  Success looks like: <verbatim from Takeaway>
+  Validated by: <verbatim>
+  Constraints: <verbatim>
+
+Baseline eval: <value> (matches declared, tolerance <tol>)
+Program-adversary: <verdict> (BLOCKER 0 / MAJOR <n> / MINOR <n>)
+Contract hash: sha256:<first 12 chars>...
+
+Cost shape (informational, NOT a cap):
+  Mode: <unilateral|co-research>; chains <C>, depth <L>, candidates <M>
+  Adversary: <dissect|codex|both>
+  Per-round adversary calls: <C × L>
+  Termination: mechanism-converge per rule #6 (no rounds/budget cap)
+
+Reply 'go' to launch, 'no' to abort, edit program.md and re-run otherwise.
+```
+
+**Behavior by execution context**:
+
+- **Interactive TTY** (`isatty(0)` true AND `isatty(2)` true): wait
+  on stdin for "go" / "no" line. **No timeout** — Stephen leaves runs
+  unattended. Ctrl-C → `state.status = "interrupted"` + write
+  state.json + exit cleanly.
+- **Non-interactive** (cron / piped stdin / tmux background): refuse
+  start unless `--auto-launch-after-gate` flag explicit. With the
+  flag, store `state.round_0.{auto_launched: true, bypass_reason:
+  "non-tty + --auto-launch-after-gate"}`. Without, exit with
+  `gate-failed-terminal` and informative message ("non-TTY launch
+  requires --auto-launch-after-gate; aborting").
+
+Single flag covers both batch-confirm-bypass and non-TTY autostart
+(codex round-2 verdict 2: same security event — bypassing human stdin
+confirmation after gates pass).
+
+### G. Migration: `--migrate-takeaway` (drafts only, never autostart)
+
+For v2.5–v2.15 program.md missing the Takeaway section, the loop
+provides an opt-in migration path:
+
+```
+abelian program.md --migrate-takeaway
+```
+
+Behavior:
+
+1. Read program.md sections (Goal, Eval, Metric, Constraints).
+2. Draft a Takeaway section satisfying B (Success cites Goal +
+   Metric name+direction; Validated_by cites Eval/Metric and is
+   grep-able / runnable; Constraints cites ≥1 actual prohibition).
+3. Write the draft to program.md (in-place edit) + emit a unified
+   diff to stdout for user review.
+4. **Exit immediately**. Never autostart the loop after migration.
+   User reviews + commits + re-runs without `--migrate-takeaway`.
+
+Migration is intentionally narrow (Takeaway only, not other v2.16
+fields). Other gaps (no baseline eval, Strategy <2 axes, missing
+Eval ground) require manual fix. Reason: automated migration of more
+fields = silent fabrication of contract by mutator. Migration is the
+place where loud-fail beats quiet-helpful.
+
+### H. state.round_0 schema
+
+```json
+"round_0": {
+  "checklist_passed": true,
+  "checklist_failures": [],
+  "baseline_eval": {
+    "value": 0.42,
+    "file": "round-0/eval.txt",
+    "tolerance": 0.01,
+    "matches_declared": true
+  },
+  "program_adversary": {
+    "file": "round-0/program-adversary.txt",
+    "verdict": "<single line from header>",
+    "evidence_class": "theoretical",
+    "blockers": 0,
+    "majors": 1,
+    "minors": 2,
+    "adversary_nonce": "...",
+    "adversary_started_at": "..."
+  },
+  "takeaway": {
+    "success_looks_like": "...",
+    "validated_by": "...",
+    "constraints": "..."
+  },
+  "program_contract_hash": "sha256:...",
+  "user_confirmed_at": "2026-05-03T15:30:00.000-0700",
+  "auto_launched": false,
+  "bypass_reason": null,
+  "reconfirmation_required": false
+}
+```
+
+### I. Frame-break Protocol step 4 boundary (rule #16 ↔ Frame-break)
+
+When Frame-break Protocol step 4 (goal re-paraphrase from current
+state) is executing, distinguish two outcomes:
+
+- **In-frame re-paraphrase** (default): Takeaway and program-contract
+  hash still valid; mutator generates fresh paraphrase from current
+  metric vs target gap, allows ≤2 speculative routes
+  (`est_metric_delta: "unknown"`). Loop continues normally.
+- **Contract invalidity surfaces**: any of the following → abort to
+  round-0 with `state.round_0.reconfirmation_required = true`:
+  - `metric_delta` direction inverts mid-run (sign change with
+    absolute value ≥ baseline_tolerance) → metric no longer measures
+    the goal as Takeaway claimed.
+  - `Takeaway.Validated_by` stops being grep-able / runnable (e.g.,
+    cited file deleted, cited shell command missing).
+  - Program-contract hash mismatch surfaces during refresh.
+
+Aborting to round-0 is the correct response to contract invalidity:
+the LLM cannot creatively escape a broken contract; only the human
+can re-confirm.
+
+### Why this rule is rule #16 and not three rules
+
+Round-1 codex review (Route-1, est_metric_delta +1.6) preferred a
+single dense rule over splitting into checklist (#16) + Takeaway (#17)
++ confirmation (#18). Reason: all three are aspects of one semantic
+unit ("the program.md contract is sharp + measured + agreed before
+round 1 starts"). Splitting would induce rule-number sprawl without
+adding clarity; the dense rule matches Occam and stays consistent
+with how rules #11 (header block) and #12 (code-review supplemental)
+embed multiple sub-mechanisms within one rule.
+
+### Empirical anchor
+
+Codex 56-round trading-internal PM dogfood (2026-05-02) had two
+upstream causes that v2.15 partially addressed and rule #16 closes:
+
+1. Per-round goal-anchor didn't propagate (closed by rule #14 Mission
+   Thread, v2.15).
+2. Cross-layer evidence got muddled (closed by rule #15 Evidence
+   Class, v2.15).
+
+But both v2.15 fixes assume program.md itself is sharp at round-0.
+If program.md Goal is "improve trading internal" with no Takeaway
+contract and a fabricated baseline, every round of v2.15 paraphrases
+the fuzz forward. v2.16's rule #16 closes this last upstream cause:
+the contract itself is checked, measured, hashed, and human-signed
+before any round runs.
+
+The 4-razor history of v2.16 design (TODO.md "v2.16 Razor history")
+documents the full reasoning trail: round-1 codex review found 6
+issues (2 BLOCKER + 4 MAJOR + 1 MINOR/MAJOR), peer-A response found
+6 counter-pushes, round-2 codex review added 3 more MAJORs and
+converged. Final spec is the integration of all 12 verified-substantive
+findings.
