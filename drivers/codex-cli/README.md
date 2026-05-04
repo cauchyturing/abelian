@@ -16,8 +16,7 @@ Wrap as alias if running often. Prompt is intentionally inlined — codex sees p
 
 ## Codex skill discovery
 
-For Codex environments that discover skills from `~/.codex/skills`, install the
-Codex-specific wrapper skill instead of symlinking the abelian repo root:
+For Codex environments that scan `~/.codex/skills`, install the wrapper at [`skills/abelian/`](skills/abelian/SKILL.md) instead of symlinking the repo root:
 
 ```bash
 export ABELIAN_HOME=~/abelian
@@ -25,13 +24,9 @@ mkdir -p "${CODEX_HOME:-$HOME/.codex}/skills"
 ln -s "$ABELIAN_HOME/drivers/codex-cli/skills/abelian" "${CODEX_HOME:-$HOME/.codex}/skills/abelian"
 ```
 
-Restart Codex after installing so the skill list is reloaded.
+Restart Codex so the skill list reloads.
 
-Do **not** symlink the repo root directly to
-`${CODEX_HOME:-$HOME/.codex}/skills/abelian`: the root `SKILL.md` is the
-upstream Abelian protocol and carries harness-specific metadata. The wrapper at
-`drivers/codex-cli/skills/abelian/` keeps Codex discovery metadata small and
-delegates execution to the canonical protocol files.
+The repo-root `SKILL.md` is the upstream protocol with harness-specific frontmatter (and is large — 502 lines post-razor); the wrapper exposes a Codex-clean entrypoint that resolves `$ABELIAN_HOME` and delegates to canonical files.
 
 ## What codex does
 
