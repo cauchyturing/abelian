@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Probe script for rule #18 enforcement campaign.
 # Tests 5 gap-closure axes; outputs integer count of axes closed (0-5).
-# POSIX-portable; bash 3.2+ compatible (no assoc arrays).
+# POSIX-sh portable; bash 3.2+ compatible (no assoc arrays).
 
 set -u  # do NOT set -e — we want all probes to run even if some fail
 
 # Resolve repo root from script location.
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+SCRIPT_DIR="$( CDPATH= cd -- "$( dirname -- "$0" )" && pwd )"
 REPO_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 
 INVARIANTS="$REPO_ROOT/INVARIANTS.md"
@@ -65,8 +65,8 @@ fi
 #   (a) verdict whitelist (check 4 extension)
 #   (b) per-route grounding (check 8 extension)
 # Pass criterion: rule #2 section explicitly mentions verdict whitelist
-# (PROBE-PASS|FAIL|CONCEDED|NON-CODIFIABLE-ESCALATED) AND mentions grounding
-# enforcement for candidate_routes.
+# (PROBE-PASS|FAIL|CONCEDED|NON-CODIFIABLE-ESCALATED) AND citation-quality
+# grounding enforcement for candidate_routes.
 # ---------------------------------------------------------------------------
 if [ -f "$INVARIANTS" ]; then
   # Extract rule #2 block (from "## 2." to next "## ").
@@ -82,8 +82,13 @@ if [ -f "$INVARIANTS" ]; then
     WHITELIST_OK=1
   fi
 
-  # Grounding: rule #2 must reference grounding enforcement for routes.
-  if echo "$RULE2_BLOCK" | grep -qi "grounding"; then
+  # Grounding: rule #2 must reference citation-quality grounding anchors.
+  if echo "$RULE2_BLOCK" | grep -qi "grounding" \
+     && echo "$RULE2_BLOCK" | grep -qi "real anchor" \
+     && echo "$RULE2_BLOCK" | grep -qi "file path + line range" \
+     && echo "$RULE2_BLOCK" | grep -qi "command +" \
+     && echo "$RULE2_BLOCK" | grep -qi "actual output" \
+     && echo "$RULE2_BLOCK" | grep -qi "quoted text + source"; then
     GROUNDING_OK=1
   fi
 

@@ -34,7 +34,13 @@ no longer produced. See Migration section.
 4. Each peer's verdict line (recorded in
    `state.rounds[N].peer_<slot>_verdict_line`) appears verbatim in
    the corresponding peer-N.txt body (`grep -qF "$VERDICT" peer-<slot>.txt`).
-   Closes the "compacted agent fabricates a clean review" hole.
+   For `ABELIAN-PEER-v1` files, the recorded verdict MUST also be one of
+   the rule #18 counter-mode whitelist values: `PROBE-PASS`,
+   `PROBE-FAIL`, `CONCEDED`, or `NON-CODIFIABLE-ESCALATED`. Legacy
+   `ABELIAN-ADV-v1` files remain read-only-accepted during the rule #11
+   deprecation window with their archived single-line verdicts. Closes
+   the "compacted agent fabricates a clean review" hole while preventing
+   freeform verdict drift in new peer output.
 5. Drift check passes (rule #4).
 6. `$RUN_DIR/round-N/pre-files.txt` exists (rule #5).
 7. Eval ran in this round's process and produced the metric value
@@ -45,7 +51,10 @@ no longer produced. See Migration section.
    `state.rounds[N-1].mission_thread.goal_paraphrase` (string equality
    check; identical paraphrase = mutator skipped re-reading program.md =
    gate-fail); `selection_reason` mentions at least one unpicked route
-   from `candidate_routes` by id. See rule #14 for schema.
+   from `candidate_routes` by id; every
+   `mission_thread.candidate_routes[i].grounding` field is present,
+   non-empty, and cites a real anchor: file path + line range, command +
+   actual output, or quoted text + source. See rule #14 for schema.
 9. **Evidence Class enum (rule #15)** — each `peer-<slot>.txt` header
    block contains `evidence_class:` line and value is in the whitelist
    (`theoretical | paper | replay | settled | dry_run | live`).
