@@ -647,7 +647,7 @@ Compiles fuzzy mission to rule #16-compliant program.md draft via per-field adve
 | # | Output | Cost | Locked attack classes | Converge predicate |
 |---|---|---|---|---|
 | 0 — Triage | classification | ~$0.05 | n/a | classification commits |
-| 1 — Outcome Distillation + Grounding | observable end-state + ≥1 ground citation | ~$0.5 | c1, c2 | attack_survival + mission_traceability + rule_16_composability (Goal clause) |
+| 1 — Outcome Distillation + Grounding | observable end-state + ≥1 ground citation | ~$0.5 | c1, c2 | attack_survival + mission_traceability + rule_16_composability + propose_grounding (Goal clause) |
 | 2 — Metric Forge + Runnable Eval | metric + runnable Eval shell + dry-run-parse | ~$0.5 | c3, c4 | + Eval parses to number AND cited files/commands exist |
 | 3 — Lever + Constraint | ≥2 Strategy axes + Constraints (Pass 3 attack byproduct) | ~$0.5 | d4, c1 | + ≥2 surviving axes |
 | 4 — Takeaway Derivation | mechanical compose Takeaway 3 fields per rule #16 B | $0 | n/a (mechanical_validator) | source_coverage + rule_16_B_quote_grep + semantic_linkage |
@@ -662,10 +662,11 @@ Reads ONLY: fuzzy mission text + optional `Target hint:` paths in mission-file +
 
 ### Mechanical converge predicate (Pass 1-3)
 
-3 conditions, all required:
+4 conditions, all required:
 - `attack_survival` — no BLOCKER from peer challenges
 - `mission_traceability` — surviving candidate contains ≥1 verbatim/paraphrased phrase from fuzzy mission text
 - `rule_16_composability` — surviving fields satisfy rule #16 hard-checklist clause for that field
+- `propose_grounding` — every candidate route / proposal surfaced by Pass 1-3 cites a grounding anchor (file path + line range, command + actual output, or quoted text + source)
 
 Pass 4 substitutes `mechanical_validator_passed` (3 conditions: source_coverage + rule_16_B_quote_grep + semantic_linkage). Pass 4 fails → route back to Pass 2 with c3-definition-elasticity input. Pass 1-3 mutual-KILL after 2 retries → re-run Pass 0 triage; abort if re-triage outputs `fuzzy-ungrounded`.
 
