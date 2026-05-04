@@ -16,19 +16,16 @@ Wrap as alias if running often. Prompt is intentionally inlined — codex sees p
 
 ## Codex skill discovery
 
-Codex auto-scans `.agents/skills/` at four levels in priority order: `$CWD/.agents/skills`, `$CWD/../.agents/skills`, `$REPO_ROOT/.agents/skills`, then user-level `$HOME/.agents/skills`. (Source: [Codex skills docs](https://developers.openai.com/codex/skills).) Install the wrapper at [`skills/abelian/`](skills/abelian/SKILL.md) into the user-level path:
+For Codex environments that scan `~/.codex/skills`, use the installer instead of symlinking the repo root:
 
 ```bash
-export ABELIAN_HOME=~/abelian
-mkdir -p "$HOME/.agents/skills"
-ln -s "$ABELIAN_HOME/drivers/codex-cli/skills/abelian" "$HOME/.agents/skills/abelian"
+git clone https://github.com/Abel-ai-causality/abelian.git ~/abelian
+bash ~/abelian/integrations/codex/install.sh
 ```
 
-Restart Codex so the skill list reloads. Folder-level symlinks under `.agents/skills/<name>/` are supported (per openai/codex#11314); do **not** symlink only `SKILL.md` (file-level symlinks are dropped per openai/codex#17344) and do **not** symlink `.agents/skills` itself (top-level dir symlinks are skipped per the same bug).
+Restart Codex so the skill list reloads.
 
-Repo-local install (project-scoped instead of user-scoped) works the same way: `ln -s "$ABELIAN_HOME/drivers/codex-cli/skills/abelian" .agents/skills/abelian` from your target project root.
-
-The repo-root `SKILL.md` is the upstream protocol with harness-specific frontmatter (502 lines post-razor); the wrapper exposes a Codex-clean entrypoint that resolves `$ABELIAN_HOME` and delegates to canonical files.
+The repo-root `SKILL.md` is the upstream protocol with harness-specific frontmatter. The installer generates a Codex-compatible `SKILL.md`, copies runtime support files (`INVARIANTS.md`, `prompts/dissect.md`, `agents/openai.yaml`) into `${CODEX_HOME:-$HOME/.codex}/skills/.generated/abelian`, then symlinks `${CODEX_HOME:-$HOME/.codex}/skills/abelian` to that generated package.
 
 ## What codex does
 
