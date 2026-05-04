@@ -53,22 +53,23 @@ round: {{ROUND}}
 peer: {{PEER}}
 nonce: {{NONCE}}
 started_at: {{STARTED_AT}}
-verdict: <YOUR ONE-LINE VERDICT>
+verdict: <PROBE-PASS|PROBE-FAIL|CONCEDED|NON-CODIFIABLE-ESCALATED>
 evidence_class: <theoretical|paper|replay|settled|dry_run|live>
 ---
 ```
 
 Legacy `ABELIAN-ADV-v1` header is read-only-accepted during deprecation window; new calls MUST emit `ABELIAN-PEER-v1`.
 
-After `---`, list each Attack Class number + criterion-4 attack-or-`n/a` evidence.
+After `---`, write `summary: <one-line prose summary>`, then list each Attack Class number + criterion-4 attack-or-`n/a` evidence.
 
 Optional after attacks (informational, non-binding): `alternative_routes:` block listing routes you'd consider if asked to propose. Each entry: `id`, `mechanism` (one line), `est_metric_delta` (float or `unknown`), `rationale`. The next round's peers may mine these for `mission_thread.candidate_routes` (rule #14 reject-pool mining + Frame-break Protocol step 5).
 
 ## Return value
 
-Return ONLY the verdict line text (what follows `verdict:` in the header). No commentary, no markdown, no quotes. Driver parses line-for-line and stores in `state.rounds[N].peer_<slot>_verdict_line`.
+Return ONLY the verdict enum token text (what follows `verdict:` in the header). No commentary, no markdown, no quotes. Driver parses line-for-line and stores in `state.rounds[N].peer_<slot>_verdict_line`.
 
 Examples:
-- `no attacks across all classes — clean`
-- `1 attack: correctness fails on input X (class 8)`
-- `2 attacks: edge-case empty list panics (class 9), fp truncation at N=4M (class 10)`
+- `PROBE-PASS`
+- `PROBE-FAIL`
+- `CONCEDED`
+- `NON-CODIFIABLE-ESCALATED`
