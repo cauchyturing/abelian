@@ -34,29 +34,39 @@ no longer produced. See Migration section.
 4. Each peer's verdict line (recorded in
    `state.rounds[N].peer_<slot>_verdict_line`) appears verbatim in
    the corresponding peer-N.txt body (`grep -qF "$VERDICT" peer-<slot>.txt`).
-   Closes the "compacted agent fabricates a clean review" hole.
+   For `ABELIAN-PEER-v1` files, the recorded verdict MUST also be one of
+   the rule #18 counter-mode whitelist values: `PROBE-PASS`,
+   `PROBE-FAIL`, `CONCEDED`, or `NON-CODIFIABLE-ESCALATED`. Legacy
+   `ABELIAN-ADV-v1` files remain read-only-accepted during the rule #11
+   deprecation window with their archived single-line verdicts. Closes
+   the "compacted agent fabricates a clean review" hole while preventing
+   freeform verdict drift in new peer output.
 5. Drift check passes (rule #4).
 6. `$RUN_DIR/round-N/pre-files.txt` exists (rule #5).
-7. Eval ran in this round's process and produced the metric value
-   recorded in `state.rounds[N].metric_value`.
+7. Eval ran for each peer candidate and produced the metric values
+   recorded in `state.rounds[N].peer_candidates[]`; champion metric and
+   direction-normalized `champion_progress_delta` are recorded.
 8. **Mission Thread completeness (v2.15, rule #14)** —
    `state.rounds[N].mission_thread` is present with all 7 fields populated;
    `candidate_routes` length ≥ 2; `goal_paraphrase` differs from
    `state.rounds[N-1].mission_thread.goal_paraphrase` (string equality
    check; identical paraphrase = mutator skipped re-reading program.md =
    gate-fail); `selection_reason` mentions at least one unpicked route
-   from `candidate_routes` by id. See rule #14 for schema.
+   from `candidate_routes` by id; every
+   `mission_thread.candidate_routes[i].grounding` field is present,
+   non-empty, and cites a real anchor: file path + line range, command +
+   actual output, or quoted text + source. See rule #14 for schema.
 9. **Evidence Class enum (rule #15)** — each `peer-<slot>.txt` header
    block contains `evidence_class:` line and value is in the whitelist
    (`theoretical | paper | replay | settled | dry_run | live`).
 10. **Goal-progress required (v2.15, rule #14)** — at least ONE of:
-    (a) `mission_thread.metric_delta > 0`,
+    (a) `mission_thread.champion_progress_delta > 0`,
     (b) `mission_thread.blocker_status` ∈ `{removed, partially}`,
     (c) `mission_thread.exploration_round = true` AND
     `state.frame_break_count_consecutive ≤ 2` (i.e., the round is
     explicitly an exploration / frame-break round and we have not
     chained more than 2 consecutive exploration rounds).
-    Pure attack-survival with `metric_delta = 0 AND blocker_status = n/a
+    Pure attack-survival with `champion_progress_delta = 0 AND blocker_status = n/a
     AND exploration_round = false` is gate-fail. This is the structural
     enforcement of "attack must serve goal, not exist for its own sake."
 
@@ -166,11 +176,12 @@ alone. The loop's goal is goal-fulfillment, not attack-survival.**
 
 Valid termination conditions (v2.15):
 
-- **Goal met** — eval ≥ target (unilateral) OR champion ≥ target (co-research)
+- **Goal met** — champion satisfies Metric direction (`max`: eval ≥ target;
+  `min`: eval ≤ target)
 - **No-proposal-after-frame-breaks** — `state.frame_break_count_consecutive
   ≥ K` (default K=2) AND the most recent frame-break protocol run
   (see SKILL.md "Frame-break Protocol" section) yielded no
-  `candidate_routes` entry with `est_metric_delta > 0` despite running
+  `candidate_routes` entry with `est_progress_delta > 0` despite running
   ALL 5 mandatory frame-break steps (reject-pool mining, attack-class
   library escalation, peer framing swap if co-research, goal
   re-paraphrase from current state, cross-peer alternative_routes
@@ -331,7 +342,8 @@ evidence_class: theoretical | paper | replay | settled | dry_run | live
 [optional] alternative_routes:
   - id: <slug>
     mechanism: <one-line description>
-    est_metric_delta: <float | "unknown">
+    est_progress_delta: <float | "unknown">
+    grounding: <file path + line range | command + actual output | quoted text + source>
     rationale: <why peer would consider this>
 ```
 
@@ -352,12 +364,12 @@ evidence_class: theoretical | paper | replay | settled | dry_run | live
 ## 12. Code Review supplemental gate (opt-in, v2.11+)
 
 program.md `Code review: on` enables an additional code-quality review layer that
-runs **after** rule #1's dissect/codex adversary call and **before**
+runs **after** rule #1's peer challenge call and **before**
 rule #2's commit-gate. It uses codex CLI's purpose-built `codex review`
 subcommand (with its built-in P1/P2/P3 severity schema) — separate from
-and supplemental to rule #1's domain-specific attack-class adversary.
+and supplemental to rule #1's domain-specific peer challenge.
 
-**Why supplemental, not replacement**: dissect adversary covers
+**Why supplemental, not replacement**: peer challenge covers
 domain-specific attack classes the program.md author defined (e.g.
 "correctness must match O(N²) baseline", "integer-overflow at N=4M").
 codex review covers code-quality issues codex's built-in prompt is
@@ -466,19 +478,20 @@ the user to run co-research peer manually.
 
 Every round populates `state.rounds[N].mission_thread` BEFORE commit-gate. Missing/incomplete = commit-gate check 8 fails = revert.
 
-```json
+```text
 "mission_thread": {
   "goal_paraphrase": str,           // fresh paraphrase, MUST differ from prior round
-  "metric_delta": float | null,     // null requires exploration_round=true
+  "champion_progress_delta": float | null, // direction-normalized; null requires exploration_round=true
   "blocker_status": "removed | partially | blocked_on:<dep> | n/a",
   "mission_relevance": str,         // one sentence; cites Takeaway.Validated_by if rule #16 active
   "candidate_routes": [             // ≥2 entries; single-route = gate-fail
-    { "id": str, "mechanism": str, "est_metric_delta": float | "unknown",
-      "est_cost": "cheap | medium | expensive", "blocker_chain": str | null }
+    { "id": str, "mechanism": str, "est_progress_delta": float | "unknown",
+      "est_cost": "cheap | medium | expensive", "blocker_chain": str | null,
+      "grounding": "file path + line range | command + actual output | quoted text + source" }
   ],
-  "selected_route_id": str,         // matches a candidate_routes entry
+  "selected_route_id": str,         // champion route; matches a candidate_routes entry
   "selection_reason": str,          // MUST cite ≥1 unpicked route's trade-off by id
-  "exploration_round": bool         // true allows null metric_delta + "unknown" est_metric_delta
+  "exploration_round": bool         // true allows null champion_progress_delta + "unknown" est_progress_delta
 }
 ```
 
@@ -486,17 +499,19 @@ Every round populates `state.rounds[N].mission_thread` BEFORE commit-gate. Missi
 
 - `goal_paraphrase` MUST differ from `state.rounds[N-1].mission_thread.goal_paraphrase` (string-equality check). Identical = mutator skipped re-reading program.md → gate-fail. Forces per-round Goal re-read.
 - `mission_relevance` forbidden phrases: "exploring / learning more / investigating / trying" without `exploration_round=true`. **Rule #16 trace** (when Takeaway present): MUST contain ≥1 verbatim/paraphrased phrase from `Takeaway.Validated_by`, paraphrase requires verbatim original cited inline. Untraceable → gate-fail.
-- `candidate_routes` ≥2 entries; unselected routes mineable by Frame-break Protocol step 1 (reject-pool mining). `est_metric_delta="unknown"` only allowed in exploration rounds.
+- `champion_progress_delta` is direction-normalized: for `Metric.direction=max`, `new_metric - old_metric`; for `min`, `old_metric - new_metric`. Positive means closer to the goal.
+- `candidate_routes` ≥2 entries; unselected routes mineable by Frame-break Protocol step 1 (reject-pool mining). `est_progress_delta="unknown"` only allowed in exploration rounds.
 - `selection_reason` MUST cite at least one unpicked route's trade-off by id ("picked highest est delta" alone insufficient).
 - `exploration_round=true` allowed for ≤2 consecutive rounds (rule #2 check 10).
 
-**Why**: without per-round goal-anchor, attacks become self-justifying ("passed all classes → commit") regardless of mission progress. Mission Thread makes goal-relevance a structural per-round artifact. Rule #2 check 10 reverts rounds with `metric_delta=0 AND blocker=n/a AND exploration=false`.
+**Why**: without per-round goal-anchor, attacks become self-justifying ("passed all classes → commit") regardless of mission progress. Mission Thread makes goal-relevance a structural per-round artifact. Rule #2 check 10 reverts rounds with `champion_progress_delta=0 AND blocker=n/a AND exploration=false`.
 
-## 15. Evidence Class enum in adversary header (v2.15)
+## 15. Evidence Class enum in peer header (v2.15)
 
-Every `adversary.txt` (and `peer-A.txt` / `peer-B.txt`) header block
-MUST include an `evidence_class:` line with value in the v15 whitelist
-(see rule #11 schema for full enum).
+Every `peer-A.txt` / `peer-B.txt` header block MUST include an
+`evidence_class:` line with value in the v15 whitelist (see rule #11
+schema for full enum). Legacy `adversary.txt` headers accepted during
+the deprecation window follow the same requirement.
 
 **Why**: prior versions did not require evidence-class disambiguation,
 so a round could pass attack-class checks based on theoretical analysis
@@ -568,7 +583,7 @@ Before round 1, run hard checklist + Takeaway-as-derived-contract + measured bas
 
 Shell-runnable Eval runs ONCE against unmutated tree → `$RUN_DIR/round-0/eval.txt`. Validate parsed value against `Metric.baseline ± Metric.tolerance`. Mismatch → TTY prompt "measured X vs declared Y; accept measured? (y/edit/abort)" (non-TTY: exit `gate-failed-terminal` with edit instructions). Self-judge mode runs frozen rubric once + stores artifact (rule #8 fuzzy-ground).
 
-Closes the v2.15 gap where `metric_delta > 0` (rule #2 check 10) was poisoned by declarative baselines.
+Closes the v2.15 gap where `progress_delta > 0` (rule #2 check 10) was poisoned by declarative baselines.
 
 ### D. Round-0 program-peer-challenge (rule #1 + #11 inherited)
 
@@ -615,7 +630,7 @@ v2.x program.md missing `## Takeaway` → checklist fails → TTY prompt "draft 
 
 Step 4 (goal re-paraphrase from current state):
 - **In-frame** (default): contract still valid; mutator paraphrases from current metric vs target gap; allows ≤2 speculative routes.
-- **Contract invalidity** → abort to round-0 + `reconfirmation_required = true` when ANY of: metric_delta sign inverts (≥ baseline_tolerance) / Takeaway.Validated_by no-longer-runnable / contract-hash mismatch surfaces. LLM cannot creatively escape broken contract — only human re-confirms.
+- **Contract invalidity** → abort to round-0 + `reconfirmation_required = true` when ANY of: raw metric movement contradicts `Metric.direction` by ≥ tolerance / Takeaway.Validated_by no-longer-runnable / contract-hash mismatch surfaces. LLM cannot creatively escape broken contract — only human re-confirms.
 
 ### Empirical anchor
 
@@ -636,7 +651,7 @@ Compiles fuzzy mission to rule #16-compliant program.md draft via per-field adve
 | # | Output | Cost | Locked attack classes | Converge predicate |
 |---|---|---|---|---|
 | 0 — Triage | classification | ~$0.05 | n/a | classification commits |
-| 1 — Outcome Distillation + Grounding | observable end-state + ≥1 ground citation | ~$0.5 | c1, c2 | attack_survival + mission_traceability + rule_16_composability (Goal clause) |
+| 1 — Outcome Distillation + Grounding | observable end-state + ≥1 ground citation | ~$0.5 | c1, c2 | attack_survival + mission_traceability + rule_16_composability + propose_grounding (Goal clause) |
 | 2 — Metric Forge + Runnable Eval | metric + runnable Eval shell + dry-run-parse | ~$0.5 | c3, c4 | + Eval parses to number AND cited files/commands exist |
 | 3 — Lever + Constraint | ≥2 Strategy axes + Constraints (Pass 3 attack byproduct) | ~$0.5 | d4, c1 | + ≥2 surviving axes |
 | 4 — Takeaway Derivation | mechanical compose Takeaway 3 fields per rule #16 B | $0 | n/a (mechanical_validator) | source_coverage + rule_16_B_quote_grep + semantic_linkage |
@@ -651,10 +666,11 @@ Reads ONLY: fuzzy mission text + optional `Target hint:` paths in mission-file +
 
 ### Mechanical converge predicate (Pass 1-3)
 
-3 conditions, all required:
+4 conditions, all required:
 - `attack_survival` — no BLOCKER from peer challenges
 - `mission_traceability` — surviving candidate contains ≥1 verbatim/paraphrased phrase from fuzzy mission text
 - `rule_16_composability` — surviving fields satisfy rule #16 hard-checklist clause for that field
+- `propose_grounding` — every candidate route / proposal surfaced by Pass 1-3 cites a grounding anchor (file path + line range, command + actual output, or quoted text + source)
 
 Pass 4 substitutes `mechanical_validator_passed` (3 conditions: source_coverage + rule_16_B_quote_grep + semantic_linkage). Pass 4 fails → route back to Pass 2 with c3-definition-elasticity input. Pass 1-3 mutual-KILL after 2 retries → re-run Pass 0 triage; abort if re-triage outputs `fuzzy-ungrounded`.
 
@@ -692,7 +708,7 @@ Every peer operates in two modes per round/pass; conflating them collapses loop 
 ### PROPOSE mode: innovative AND grounded
 
 When generating mutations, candidate routes, outcomes, metrics, levers, or alternative_routes:
-- **Innovative** — novel framings / mechanism enumeration / cross-domain analogues. Safe-incremental restatements of prior round ("extend X with...", "refine the existing...", "polish the current...") FORBIDDEN unless `exploration_round=true` AND ≥1 speculative route (`est_metric_delta: "unknown"` per rule #14).
+- **Innovative** — novel framings / mechanism enumeration / cross-domain analogues. Safe-incremental restatements of prior round ("extend X with...", "refine the existing...", "polish the current...") FORBIDDEN unless `exploration_round=true` AND ≥1 speculative route (`est_progress_delta: "unknown"` per rule #14).
 - **Grounded** — every proposal cites ≥1 anchor: file path + line range, command + actual output, or quoted user/spec/doc text with source. No vibes, no fabricated specifics, no authority-by-citation without citation existing (c4 generalized).
 
 Commit-gate (rule #2 check 8) extends: any `mission_thread.candidate_routes` entry lacking grounding citation OR using safe-incremental phrasing without exploration_round=true → check fails → revert.
@@ -724,7 +740,7 @@ Both drivers (Claude Code Agent + codex CLI subprocess) embed in peer prompts:
 ```
 PROPOSE: ≥2 candidate_routes. Each cites ≥1 file/command/output.
          Safe-incremental forbidden unless exploration_round=true with
-         ≥1 speculative route (est_metric_delta: "unknown").
+         ≥1 speculative route (est_progress_delta: "unknown").
 
 COUNTER: respond via (a) probe + run + PASS/FAIL — preferred,
          (b) concede + revert, OR (c) non_codifiable + escalation_required.

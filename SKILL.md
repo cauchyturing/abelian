@@ -37,10 +37,10 @@ description: >
 
   **Peer configuration** is auto-detected from driver (Claude Code → `claude+claude`; codex CLI → `codex+codex`). Cross-family `claude+codex` is opt-in via program.md `Peer policy: cross-family` (doubles cost, requires both LLMs available).
 
-  Cost 2× per round vs single-peer review tools but ~1.5× fewer rounds for
-  non-trivial work (~33% net overhead) — empirically validated on
-  v2.14/v2.15/v2.16/v2.17 design dogfood. Diversity comes from DIFFERENT
-  CONTEXT FRAMING per peer at SAME max-effort tier.
+  Default cost with 2 peers is explicit, not hidden: 2 proposals + 2 evals
+  + 2 cross-attacks per round, plus probes and optional codex review.
+  Diversity comes from DIFFERENT CONTEXT FRAMING per peer at SAME
+  max-effort tier.
 
   Tasks that genuinely fit single-peer review (typo fix, single-axis verify,
   ship-prep against a known target) are out of abelian's scope — abelian
@@ -89,7 +89,7 @@ A `program.md` with these sections:
 - **Target** — files the agent may edit. v2.16 hard-checks each path's parent directory exists, and each path either (a) exists, OR (b) has explicit `create:` marker (e.g., `Target: docs/new-design.md create:`) declaring it will be created. Inside-repo only (no `..` escape, no absolute paths outside repo root).
 - **Eval** — shell command outputting a number (preferred) OR `self-judge` with a frozen rubric. For non-`code` task classes, see INVARIANTS rule #8 fuzzy-ground protocol — `Eval ground:` declaration required. v2.16: round-0 runs Eval ONCE against unmutated baseline, stores result in `$RUN_DIR/round-0/eval.txt`, validates against declared Metric.baseline within Metric.tolerance.
 - **Eval ground** *(v2.14, required for non-`code` task classes per INVARIANTS rule #8)* — declared ground source(s): ≥1 of (b)/(c)/(d) options from rule #8; option (a) self-ground is supplementary only.
-- **Metric** — `<name>: <baseline> <direction> [<tolerance>]`. Direction ∈ `{min, max}`. Testable per positioning — rubric score, count, coverage rate, runtime; not vibes / human-acceptance-only. Tasks that cannot articulate a testable metric are out of scope for abelian (use ce-brainstorm or human discussion). **Tolerance (v2.16)**: defaults by type when omitted — `pass-rate / file-count / count` → exact (0); `float / runtime` → epsilon = max(1e-9, 0.01 × |baseline|); noisy benchmarks → repeated_median (5 runs). Tolerance enables baseline validation in round-0 step C without rejecting legitimate measurement noise.
+- **Metric** — `<name>: <baseline> <direction> [<tolerance>]`. Direction ∈ `{min, max}`. All progress gates use direction-normalized `progress_delta`: for `max`, `new - old`; for `min`, `old - new`. Testable per positioning — rubric score, count, coverage rate, runtime; not vibes / human-acceptance-only. Tasks that cannot articulate a testable metric are out of scope for abelian (use ce-brainstorm or human discussion). **Tolerance (v2.16)**: defaults by type when omitted — `pass-rate / file-count / count` → exact (0); `float / runtime` → epsilon = max(1e-9, 0.01 × |baseline|); noisy benchmarks → repeated_median (5 runs). Tolerance enables baseline validation in round-0 step C without rejecting legitimate measurement noise.
 - **Constraints** — what NOT to do
 - **Strategy** — what to try, in what order. v2.16 hard-checks ≥2 axes (chains C>1 and co-research depend on diversity; single-axis = use unilateral mode + a different tool, not abelian).
 - **Cells** *(portfolio mode only)* — diversity axes you want covered (e.g., "memoization", "algorithm-swap", "data-restructure"). Free-text labels.
@@ -180,7 +180,7 @@ OKR is user-driven hierarchical decomposition (Objective → KR → Task). v3.0 
 
 ## State Persistence — `$RUN_DIR/state.json`
 
-`state.json` is the single source of truth across context compactions; persist after every phase transition; re-read at round step 0 (rule #3). `$RUN_DIR = abelian/runs/<RUN_ID>/` (`RUN_ID` = local-time `YYYY-MM-DD-HHMM`). Per-round artifacts at `$RUN_DIR/round-N/{peer-A.txt, peer-B.txt, pre-files.txt, plan.md, eval.txt}`.
+`state.json` is the single source of truth across context compactions; persist after every phase transition; re-read at round step 0 (rule #3). `$RUN_DIR = abelian/runs/<RUN_ID>/` (`RUN_ID` = local-time `YYYY-MM-DD-HHMM`). Per-round artifacts at `$RUN_DIR/round-N/{peer-A/, peer-B/, peer-A.txt, peer-B.txt, pre-files.txt, champion.md}`; each peer dir holds its own `proposal.md`, `diff.patch`, and `eval.txt`.
 
 Top-level keys:
 
@@ -192,29 +192,29 @@ sharpening,    // see rule #17
 round_0        // see rule #16 H
 ```
 
-Per-round keys (within `rounds[]`): `n, cell, status, metric_value, peer_<slot>_{verdict_line, nonce, started_at, file}, mission_thread (rule #14), pre_files_file, frame_break_fired, frame_break_steps_run[], commit, started_at, ended_at`.
+Per-round keys (within `rounds[]`): `n, cell, status, peer_candidates[{slot, route_id, metric_value, progress_delta, diff_patch, eval_file}], champion_slot, champion_metric_value, champion_progress_delta, peer_<slot>_{verdict_line, nonce, started_at, file}, mission_thread (rule #14), pre_files_file, frame_break_fired, frame_break_steps_run[], commit, started_at, ended_at`.
 
 Run `status`: `running | completed | interrupted | drift-stopped (rule #4) | contract-drift-stopped (rule #16) | gate-failed-terminal`. Round `status`: `pending | mutated | eval-done | peer-done | kept | reverted | gate-failed`.
 
-`frame_break_count_consecutive` resets on any round with `metric_delta > 0` OR `blocker_status ∈ {removed, partially}`. Increments on each fired frame-break. Termination via `no-proposal-after-K-frame-breaks` checks against K (default 2).
+`frame_break_count_consecutive` resets on any round with `champion_progress_delta > 0` OR `blocker_status ∈ {removed, partially}`. Increments on each fired frame-break. Termination via `no-proposal-after-K-frame-breaks` checks against K (default 2).
 
 ## Mission Thread per round — rule #14
 
-Every round populates `state.rounds[N].mission_thread` (7 fields) BEFORE commit-gate. Anchors per-round work to goal; closes the gap where `metric_delta` could be 0 round-after-round while attacks landed clean.
+Every round populates `state.rounds[N].mission_thread` (7 fields) BEFORE commit-gate. Anchors per-round work to goal; closes the gap where `progress_delta` could be 0 round-after-round while attacks landed clean.
 
-Mutator workflow:
+Peer workflow:
 
 1. Re-read program.md (forced — `goal_paraphrase` MUST differ from prior round).
-2. Survey prior `candidate_routes` for unpicked routes with positive est_metric_delta (reject-pool warm-start).
-3. Generate ≥2 `candidate_routes` for THIS round (mechanism + est_metric_delta + est_cost + blocker_chain).
-4. Select one + write `selection_reason` citing ≥1 unpicked route's trade-off by id.
-5. Implement (Loop steps 2-7), populate `metric_delta` + `blocker_status` from eval/outcome.
+2. Survey prior `candidate_routes` for unpicked routes with positive `est_progress_delta` (reject-pool warm-start).
+3. Generate ≥2 `candidate_routes` for THIS round (mechanism + `est_progress_delta` + est_cost + blocker_chain); assign at least one route to each peer.
+4. Peers implement their assigned routes, cross-attack, then the orchestrator selects champion + writes `selection_reason` citing ≥1 unpicked route's trade-off by id.
+5. Populate `champion_progress_delta` + `blocker_status` from eval/outcome.
 
-Full schema + field rules: rule #14. Commit-gate: rule #2 check 8 (completeness + freshness + selection_reason trade-off cited) + check 10 (goal-progress: `metric_delta > 0` OR `blocker_status ∈ {removed, partially}` OR `exploration_round: true` with `frame_break_count_consecutive ≤ 2`).
+Full schema + field rules: rule #14. Commit-gate: rule #2 check 8 (completeness + freshness + selection_reason trade-off cited) + check 10 (goal-progress: `champion_progress_delta > 0` OR `blocker_status ∈ {removed, partially}` OR `exploration_round: true` with `frame_break_count_consecutive ≤ 2`).
 
 ## Search Shape
 
-Default `chains=1, depth=1, candidates=1, portfolio=1` — one mutation per round, sequential. Most campaigns run here.
+Default `chains=1, depth=1, candidates=1, portfolio=1` — one true peer co-research round: peer-A and peer-B each produce one candidate, then cross-attack and champion selection. Most campaigns run here.
 
 For harder problems, declare in program.md `## Shape`:
 
@@ -225,7 +225,7 @@ For harder problems, declare in program.md `## Shape`:
 | `candidates: M` | per-step best-of-M variants (rejects logged) | Eval cheap AND single-sample variance high |
 | `portfolio: K` | K diverse cells across rounds (MAP-Elites) | Multiple valid mechanisms worth keeping per cell |
 
-Per-round cost: `Eval runs = C×L×M`, peer-challenge calls = `C×L×2`. Fix-iter multiplier ~1.5×. Typical convergence 3-10 rounds.
+Per-round cost with peer count `P` (default 2): `Eval runs = C×L×M×P`, cross-attack calls = `C×L×M×P×(P-1)`, plus probe commands and optional champion-only `codex review`. Typical convergence remains mechanism-dependent, not promised by a fixed multiplier.
 
 ### Invocation
 
@@ -244,18 +244,26 @@ All other behavior (peer pair, search shape, code-review supplemental, baseline 
 For each round:
 
 0. **Refresh (v2.8)** — `cat $SKILL_DIR/INVARIANTS.md && cat $RUN_DIR/state.json` from disk. Conversation memory of these rules drifts after R3+ compactions; the file is truth. INVARIANTS rule #3.
-1. **Hypothesize** — read Strategy + state.json `rounds[]` + current state → generate ONE testable change. Tag the change with a cell label (free-text, ≤3 words).
-2. **Mutate** — apply the change (minimal, one idea per round). Before writing, snapshot pre-files: `mkdir -p $RUN_DIR/round-N && { git ls-files -z; git ls-files -z --others --exclude-standard; } | sort -zu > $RUN_DIR/round-N/pre-files.txt`. INVARIANTS rule #5.
-3. **Evaluate** — run eval command, or self-judge against frozen rubric. Write metric value to `$RUN_DIR/round-N/eval.txt` and update `state.rounds[N].metric_value`.
-4. **Peer challenge** — spawn one peer subagent per configured peer (default 2: peer-A + peer-B), each running `prompts/dissect.md inlined` (Claude) or `codex exec` (codex CLI) on the diff + eval output. Each peer MUST write its full attack list (or `n/a-this-target` per class) to `$RUN_DIR/round-N/peer-<slot>.txt` BEFORE returning. Each peer's verdict line MUST be recorded in `state.rounds[N].peer_<slot>_verdict_line`. INVARIANTS rules #1, #7, #18. (See Peer Challenge section.)
-5. **Confirm** — run commit-gate (rule #2, 10 always-on + 1 conditional). Always-on: peer-{A,B}.txt non-empty + nonce match + mtime + verdict in body (1-4) + drift + pre-files + eval match (5-7) + mission_thread complete & fresh (8) + evidence_class enum (9) + goal-progress required (10). Conditional: codex-review clean of P1/P2 when program.md declares `Code review: on` (11). Pass → `git commit`. Fail → revert. Attacks (rule #18 COUNTER) convert to probes; probe-fail → revert.
-6. **Place** — K=1 mode: replace champion if better, else revert. K>1 mode: replace THIS cell's incumbent only if it beats that cell's score. New cell label → seed that cell.
-7. **Record** — append to History: kept/reverted/error, cell, adversary-result, metric delta.
-8. **Adapt** — 5 consecutive reverts → shift strategy. 5 rounds with no new cell filled (K>1) → write to `escalations.md`. All directions exhausted → stop early.
+1. **Propose** — peer-A and peer-B each select one grounded route from `candidate_routes` (different angles) and write `$RUN_DIR/round-N/peer-<slot>/proposal.md`.
+2. **Mutate** — each peer implements only its route on an isolated branch/worktree. Before writes, snapshot pre-files: `mkdir -p $RUN_DIR/round-N && { git ls-files -z; git ls-files -z --others --exclude-standard; } | sort -zu > $RUN_DIR/round-N/pre-files.txt`. INVARIANTS rule #5.
+3. **Evaluate** — run Eval for each candidate. Write `$RUN_DIR/round-N/peer-<slot>/eval.txt`, `diff.patch`, metric value, and direction-normalized `progress_delta`.
+4. **Cross-attack** — peer-A attacks peer-B's diff+eval; peer-B attacks peer-A's diff+eval. Each challenge runs `prompts/dissect.md inlined` (Claude) or fresh `codex exec` (Codex CLI), writes `$RUN_DIR/round-N/peer-<slot>.txt` BEFORE returning, and records `state.rounds[N].peer_<slot>_verdict_line`. INVARIANTS rules #1, #7, #18.
+5. **Verify** — attacks convert to probes. Probe fail or non-codifiable attack → candidate reverts; passing candidates survive.
+6. **Champion / Confirm** — best surviving `progress_delta` wins. Run commit-gate (rule #2, 10 always-on + 1 conditional) on champion + peer files. Conditional: champion-only codex-review clean of P1/P2 when program.md declares `Code review: on` (11). Pass → `git commit`. Fail → revert.
+7. **Place** — K=1 mode: replace champion if better, else revert. K>1 mode: replace THIS cell's incumbent only if it beats that cell's score. New cell label → seed that cell.
+8. **Record** — append to History: kept/reverted/error, cell, peer-attack result, champion `progress_delta`.
+9. **Living spec (R2+ conditional)** — after the mutual-inspiration handoff, only when `N >= 2` AND at least one revert occurred in the previous 2 rounds, run the spec-proposal prompt through the configured peer-family dispatch path: `Agent(...)` for Claude-family drivers, `codex exec` for Codex-family drivers, or a loud `codex unavailable` / fallback notice if the configured subprocess is unavailable:
+
+   ```text
+   Read program.md and state.json rounds 0-2. What 1-3 specific changes to Goal/Constraints/Strategy would make this campaign more likely to succeed based on what actually happened? Justify each change with evidence from rounds. Only propose if there's signal the current spec is wrong — no aesthetic drift. If reverts were implementation failures (wrong code, not wrong direction), respond: NO_SPEC_CHANGE.
+   ```
+
+   Write output to `$RUN_DIR/round-N/spec-proposal.md`. Orchestrator reviews before round `N+1`; no automatic program.md rewrite.
+10. **Adapt** — 5 consecutive reverts → shift strategy. 5 rounds with no new cell filled (K>1) → write to `escalations.md`. All directions exhausted → stop early.
 
 ## Peer Challenge
 
-Peer subagent receives a prompt with verbatim `program.md` Goal/Target/Constraints/Attack-Classes + fresh nonce + ISO timestamp + `prompts/dissect.md` inlined → writes attack list to `peer-<slot>.txt` with rule #11 header → returns verdict line. Both drivers identical mechanism: Claude Code uses `Agent(general-purpose)`, codex CLI uses `codex exec - -s workspace-write` subprocess.
+Challenge peer receives a prompt with verbatim `program.md` Goal/Target/Constraints/resolved Attack-Classes + the opponent's diff + eval + fresh nonce + ISO timestamp + `prompts/dissect.md` inlined → writes attack list to `peer-<slot>.txt` with rule #11 header → returns verdict line. Both drivers preserve isolated context: Claude Code uses `Agent(general-purpose)`, codex CLI uses fresh `codex exec` subprocesses.
 
 Each peer's CHALLENGE phase (rule #18 COUNTER mode) may also write an informational `alternative_routes:` section after attacks — non-binding but mineable by next round's `mission_thread.candidate_routes` (rule #14 reject-pool / Frame-break step 5).
 
@@ -281,7 +289,7 @@ Applies to: SKILL.md / program.md / design docs / proposals / decision recs / re
 
 ### Cost
 
-2× per round vs single-peer review. Mitigated by ~1.5× fewer rounds on non-trivial work via mutual inspiration → ~33% net overhead.
+Default 2-peer round = 2 proposal/implementation candidates + 2 evals + 2 cross-attacks, plus probes and optional champion-only code review. Cost is higher than reviewer-only loops; gain is real proposal diversity, not just duplicate review.
 
 ## Frame-break Protocol — creative escape, not termination
 
@@ -291,26 +299,26 @@ Plateau in a goal-driven co-research loop is when LLM creative capacity should f
 
 Fires (sets `frame_break_fired=true`, increments `frame_break_count_consecutive`) when ANY of:
 1. Both peers' verdicts = no attacks (challenge-exhausted, single round)
-2. `metric_delta ≤ 0` AND `blocker_status ∉ {removed, partially}`
-3. All `candidate_routes` have `est_metric_delta ≤ 0` (or all `"unknown"` outside an exploration chain ≤ 2)
+2. `champion_progress_delta ≤ 0` AND `blocker_status ∉ {removed, partially}`
+3. All `candidate_routes` have `est_progress_delta ≤ 0` (or all `"unknown"` outside an exploration chain ≤ 2)
 
-Resets `frame_break_count_consecutive = 0` on any round with `metric_delta > 0` OR `blocker_status ∈ {removed, partially}`.
+Resets `frame_break_count_consecutive = 0` on any round with `champion_progress_delta > 0` OR `blocker_status ∈ {removed, partially}`.
 
 ### 5 mandatory steps (in order)
 
 | # | Step | Action | Records in `frame_break_steps_run` |
 |---|---|---|---|
-| 1 | Reject-pool mining | Scan `state.rounds[*].mission_thread.candidate_routes`; promote top-3 unselected `est_metric_delta > 0` routes to current round (dedupe by mechanism) | source rounds |
+| 1 | Reject-pool mining | Scan `state.rounds[*].mission_thread.candidate_routes`; promote top-3 unselected `est_progress_delta > 0` routes to current round (dedupe by mechanism) | source rounds |
 | 2 | Attack-class library escalation | Load 1 additional library (cross-domain to Task class); fresh peer challenge with expanded classes → `round-N/peer-frame-break.txt` (rule #11 nonce header) | added library + new attacks count |
 | 3 | Peer framing swap | Swap peers' context-framing for next round (optimist↔auditor; top-down↔bottom-up; Strategy axes 1,3,5↔2,4,6; smallest-fix↔robust-fix) | new framing pair |
-| 4 | Goal re-paraphrase from current state | Mutator writes fresh `goal_paraphrase` based on current metric vs target gap; allow ≤2 speculative routes (`est_metric_delta: "unknown"`) bounded by `frame_break_count_consecutive ≤ 2` | re-paraphrased goal + speculative routes |
-| 5 | Cross-peer alternative_routes mining | Promote each peer's informational `alternative_routes` (with `est_metric_delta > 0`) into the OTHER peer's next-round `candidate_routes` | promoted routes |
+| 4 | Goal re-paraphrase from current state | Mutator writes fresh `goal_paraphrase` based on current metric vs target gap; allow ≤2 speculative routes (`est_progress_delta: "unknown"`) bounded by `frame_break_count_consecutive ≤ 2` | re-paraphrased goal + speculative routes |
+| 5 | Cross-peer alternative_routes mining | Promote each peer's informational `alternative_routes` (with `est_progress_delta > 0`) into the OTHER peer's next-round `candidate_routes` | promoted routes |
 
-**Step 4 abort to round-0 instead of in-frame re-paraphrase** when contract invalidity surfaces (rule #16 I): metric_delta direction inverts (≥ `Metric.tolerance`); `Takeaway.Validated_by` stops being grep-able/runnable; program-contract hash mismatch. Sets `state.round_0.reconfirmation_required = true`. Resume by re-invoking `abelian program.md` — TTY prompt walks user through fresh round-0 gate; non-TTY: exit with diagnostic.
+**Step 4 abort to round-0 instead of in-frame re-paraphrase** when contract invalidity surfaces (rule #16 I): raw metric movement contradicts `Metric.direction` by ≥ tolerance; `Takeaway.Validated_by` stops being grep-able/runnable; program-contract hash mismatch. Sets `state.round_0.reconfirmation_required = true`. Resume by re-invoking `abelian program.md` — TTY prompt walks user through fresh round-0 gate; non-TTY: exit with diagnostic.
 
 ### Termination via `no-proposal-after-K-frame-breaks`
 
-Fires when ALL applicable steps run AND next-round `candidate_routes` contains zero entries with `est_metric_delta > 0` AND `frame_break_count_consecutive ≥ K` (default K=2). Materially stricter than challenge-exhaustion alone — requires 2 separate frame-break rounds across all 5 steps to have failed to surface positive-EV next steps.
+Fires when ALL applicable steps run AND next-round `candidate_routes` contains zero entries with `est_progress_delta > 0` AND `frame_break_count_consecutive ≥ K` (default K=2). Materially stricter than challenge-exhaustion alone — requires 2 separate frame-break rounds across all 5 steps to have failed to surface positive-EV next steps.
 
 ### Cost
 
@@ -454,8 +462,8 @@ Loop runs till converge. No rounds/budget/wallclock caps. Termination claims val
 
 Valid termination conditions (full spec: rule #6):
 
-- **Goal met** — eval ≥ target (or champion eval ≥ target)
-- **No-proposal-after-K-frame-breaks** (K=2 default) — Frame-break Protocol fired all applicable steps; resulting `candidate_routes` has zero `est_metric_delta > 0`; held for K consecutive rounds. Creative-exhaustion, not challenge-exhaustion.
+- **Goal met** — champion satisfies Metric direction (`max`: eval ≥ target; `min`: eval ≤ target)
+- **No-proposal-after-K-frame-breaks** (K=2 default) — Frame-break Protocol fired all applicable steps; resulting `candidate_routes` has zero `est_progress_delta > 0`; held for K consecutive rounds. Creative-exhaustion, not challenge-exhaustion.
 - **Mutual KILL deadlock** — N=3 rounds where both peers' mutations revert (every attack succeeds on both sides) → escalate.
 - **User interrupt** — SIGINT/SIGTERM → finish current atomic op, write handoff, exit.
 
@@ -469,7 +477,7 @@ After loop ends, automatically write learnings to `docs/solutions/[category]/[go
 
 Locked field order (no free-form prose between fields, no embellishment):
 
-1. **What worked** — kept mutations ranked by impact, grouped by cell (portfolio mode)
+1. **What worked** — kept peer candidates ranked by impact, grouped by cell (portfolio mode)
 2. **What didn't** — reverts grouped by failure pattern (eval-fail / peer-attack-fail / both)
 3. **Peer-attack catches** — attacks that flipped kept → reverted (highest-signal; prioritize for future sessions)
 4. **Judgment calls** — non-obvious decisions that mattered

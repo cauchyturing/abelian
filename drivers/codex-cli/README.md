@@ -9,7 +9,7 @@ In your project (must be a git repo with `.gitignore` covering build artifacts �
 ```bash
 codex exec -s workspace-write "$(cat ~/abelian/SKILL.md ~/abelian/INVARIANTS.md ~/abelian/prompts/dissect.md)
 
-Run abelian on program.md per the spec above. Maintain state.json under abelian/runs/<RUN_ID>/. Run till mechanism-based converge per INVARIANTS rule #6 (no rounds cap, no budget cap). Default mode = co-research with codex × codex peer pair (different context-framing per peer at full max-effort). Default adversary in unilateral fallback = self×self codex via fresh codex exec subprocesses. Abort: Ctrl+C → status=interrupted."
+Run abelian on program.md per the spec above. Maintain state.json under abelian/runs/<RUN_ID>/. Run till mechanism-based converge per INVARIANTS rule #6 (no rounds cap, no budget cap). Default peers = codex × codex with different context-framing at full max-effort; if Codex has no native multi-agent, peer-A and peer-B are fresh codex exec subprocesses (parallel when possible, sequential is acceptable). Abort: Ctrl+C → status=interrupted."
 ```
 
 Wrap as alias if running often. Prompt is intentionally inlined — codex sees protocol verbatim, no abstraction.
@@ -31,15 +31,17 @@ The repo-root `SKILL.md` is the upstream protocol with harness-specific frontmat
 
 Becomes mutator + orchestrator. Per-round flow lives in [`SKILL.md`](../../SKILL.md) sections "The Loop" / "Round-0 Authoring Gate" / "Frame-break Protocol" — codex executes that spec.
 
-Mechanics: codex maintains `state.json` via `jq`, generates nonces via `python3 -c "import secrets; ..."`, runs git ops directly, dispatches adversary subagents via fresh `codex exec` subprocess (rule #11 nonce header inherited).
+Mechanics: codex maintains `state.json` via `jq`, generates nonces via `python3 -c "import secrets; ..."`, runs git ops directly, dispatches peer subagents via fresh `codex exec` subprocesses (rule #11 nonce header inherited). Parent codex is orchestrator only; it must not synthesize peer artifacts.
+
+Isolation gate: PROPOSE/IMPLEMENT peers may write only their own branch/worktree and `$RUN_DIR/round-N/peer-<slot>/`; CHALLENGE peers may write only `$RUN_DIR/round-N/peer-<slot>.txt`. After each subprocess returns, codex checks the dirty set; any write outside the allowed paths gate-fails that candidate or challenge.
 
 ## Code Review supplemental gate
 
 program.md `Code review: on` enables rule #12. Per-round `codex review --uncommitted -c 'model_reasoning_effort="high"'` after peer challenge, before commit-gate. Output to `round-N/codex-review.txt`; commit refused on `[P1]`/`[P2]`. Default off (cost ~doubles per round). If `node` not in PATH, prefix with `bun /path/to/codex`.
 
-## Cross-family adversary (advanced)
+## Cross-family peer (advanced)
 
-For Claude adversary on high-stakes runs, instruct codex to use anthropic SDK for the adversary step instead of `codex exec`. The Claude subagent must use a tool-use loop (file_write tool) to write `adversary.txt` — main session writing the file directly defeats rule #11's nonce defense.
+For Claude peer challenge on high-stakes runs, set program.md `Peer policy: cross-family` and instruct codex to use the anthropic SDK for the Claude peer slot instead of a second `codex exec`. The Claude subagent must use a tool-use loop (file_write tool) to write `peer-<slot>.txt` with the `ABELIAN-PEER-v1` header — main session writing the file directly defeats rule #11's nonce defense.
 
 Most teams skip this — codex × codex with different context-framing per peer is empirically competitive with cross-family pairs.
 
@@ -49,7 +51,7 @@ Most teams skip this — codex × codex with different context-framing per peer 
 |---|---|---|
 | Entry | `/abelian program.md` | inlined `codex exec` (above) |
 | Peer subagent | `Agent(general-purpose)` + `prompts/dissect.md` inlined | fresh `codex exec` subprocess + `prompts/dissect.md` inlined |
-| Cross-family | `--adversary=codex` (built-in) | anthropic SDK (manual sketch above) |
+| Cross-family | program.md `Peer policy: cross-family` | program.md `Peer policy: cross-family` + anthropic SDK (manual sketch above) |
 | State / INVARIANTS / nonce / gate / drift / modes / termination | identical |
 
-Adversary methodology lives in `prompts/dissect.md` — same content, different injection.
+Peer challenge methodology lives in `prompts/dissect.md` — same content, different injection.
