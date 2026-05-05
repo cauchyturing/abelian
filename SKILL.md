@@ -251,7 +251,14 @@ For each round:
 5. **Confirm** — run commit-gate (rule #2, 10 always-on + 1 conditional). Always-on: peer-{A,B}.txt non-empty + nonce match + mtime + verdict in body (1-4) + drift + pre-files + eval match (5-7) + mission_thread complete & fresh (8) + evidence_class enum (9) + goal-progress required (10). Conditional: codex-review clean of P1/P2 when program.md declares `Code review: on` (11). Pass → `git commit`. Fail → revert. Attacks (rule #18 COUNTER) convert to probes; probe-fail → revert.
 6. **Place** — K=1 mode: replace champion if better, else revert. K>1 mode: replace THIS cell's incumbent only if it beats that cell's score. New cell label → seed that cell.
 7. **Record** — append to History: kept/reverted/error, cell, adversary-result, metric delta.
-8. **Adapt** — 5 consecutive reverts → shift strategy. 5 rounds with no new cell filled (K>1) → write to `escalations.md`. All directions exhausted → stop early.
+8. **Living spec (R2+ conditional)** — after the mutual-inspiration handoff, only when `N >= 2` AND at least one revert occurred in the previous 2 rounds, run the spec-proposal prompt through the configured peer-family dispatch path: `Agent(...)` for Claude-family drivers, `codex exec` for Codex-family drivers, or a loud `codex unavailable` / fallback notice if the configured subprocess is unavailable:
+
+   ```text
+   Read program.md and state.json rounds 0-2. What 1-3 specific changes to Goal/Constraints/Strategy would make this campaign more likely to succeed based on what actually happened? Justify each change with evidence from rounds. Only propose if there's signal the current spec is wrong — no aesthetic drift. If reverts were implementation failures (wrong code, not wrong direction), respond: NO_SPEC_CHANGE.
+   ```
+
+   Write output to `$RUN_DIR/round-N/spec-proposal.md`. Orchestrator reviews before round `N+1`; no automatic program.md rewrite.
+9. **Adapt** — 5 consecutive reverts → shift strategy. 5 rounds with no new cell filled (K>1) → write to `escalations.md`. All directions exhausted → stop early.
 
 ## Peer Challenge
 
